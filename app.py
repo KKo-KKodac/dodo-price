@@ -7,7 +7,7 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="꼬꼬닥'S 컴퓨터 매입계산기", layout="wide")
 
-# 2. CSS 정밀 수정 (높이 및 중앙 정렬)
+# 2. CSS 정밀 수정: 라인 일치 및 버튼 중앙 정렬
 st.markdown("""
     <style>
     div[data-baseweb="select"], div[data-baseweb="input"], .stTextInput input, .stSelectbox div[role="button"] {
@@ -15,17 +15,34 @@ st.markdown("""
         display: flex !important; align-items: center !important;
     }
     div[data-baseweb="select"] > div { padding: 0 !important; display: flex !important; align-items: center !important; }
+    
+    /* 테이블 헤더와 본문의 라인(Border) 위치 일치화 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 12px 0; font-weight: bold; border-radius: 4px; text-align: center; margin-bottom: 8px;
     }
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
-    .cell-center { text-align: center; display: flex; align-items: center; justify-content: center; height: 48px; border-right: 1px solid #f0f2f6; }
-    .cell-left { display: flex; align-items: center; padding-left: 10px; height: 48px; border-right: 1px solid #f0f2f6; }
+    .header-item:last-child { border-right: none; }
+
+    /* 본문 셀 정렬 및 구분선 추가 */
+    .cell-center { 
+        text-align: center; display: flex; align-items: center; justify-content: center; 
+        height: 48px; border-right: 1px solid #f0f2f6; 
+    }
+    .cell-left { 
+        display: flex; align-items: center; padding-left: 10px; 
+        height: 48px; border-right: 1px solid #f0f2f6; 
+    }
+    /* 마지막 '담기' 열은 구분선 제거 */
+    .no-border { border-right: none !important; }
+
+    /* + 버튼 담기 칸 정중앙 배치 */
     div.stButton > button[key^="add_"] {
         width: 38px !important; min-width: 38px !important; height: 38px !important; 
-        border-radius: 50% !important; margin: 0 auto !important; display: block !important;
+        border-radius: 50% !important; margin: 0 auto !important; display: flex !important;
+        align-items: center !important; justify-content: center !important;
     }
+    
     .price-text { color: red; font-weight: bold; font-size: 16px; margin: 0; }
     .truncate-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; max-width: 100%; }
     </style>
@@ -50,7 +67,7 @@ def reset_callback():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# 5. 데이터 수집 (누락된 CPU 주소 복구 및 신규 주소 유지)
+# 5. 데이터 수집
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -87,10 +104,10 @@ def fetch_data():
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=57",
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866", # CPU 복구
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141", # CPU 복구
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608", # CPU 복구
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7"     # CPU 복구
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7"
     ]
     all_rows = []
     for url in URLS:
@@ -105,7 +122,7 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# --- 화면 구성 시작 ---
+# --- 메인 화면 ---
 st.title("🐔꼬꼬닥'S 컴퓨터 매입계산기🖥️")
 
 if st.button("🔄 시세 DB 갱신", type="primary"):
@@ -125,8 +142,15 @@ f_df = df.copy()
 if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 조회 테이블
-st.markdown('<div class="table-header"><div class="header-item" style="flex:1;">분류</div><div class="header-item" style="flex:2.5;">상품명</div><div class="header-item" style="flex:1.5;">금액</div><div class="header-item" style="flex:0.8; border-right:none;">담기</div></div>', unsafe_allow_html=True)
+# 조회 테이블: 헤더와 본문의 비율을 [1, 2.5, 1.5, 0.8]로 동일하게 유지
+st.markdown("""
+    <div class="table-header">
+        <div class="header-item" style="flex:1;">분류</div>
+        <div class="header-item" style="flex:2.5;">상품명</div>
+        <div class="header-item" style="flex:1.5;">금액</div>
+        <div class="header-item" style="flex:0.8; border-right:none;">담기</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 with st.container(height=380):
     for i, row in f_df.iterrows():
@@ -135,6 +159,7 @@ with st.container(height=380):
         cols[1].markdown(f'<div class="cell-left"><span class="truncate-text">{row["상품명"]}</span></div>', unsafe_allow_html=True)
         cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
         with cols[3]:
+            # CSS 컨테이너와 동일한 폭을 보장하여 버튼을 정중앙으로 유도
             st.button("➕", key=f"add_{i}", on_click=add_item_callback, args=(row['상품명'], row['매입가']))
 
 st.divider()
