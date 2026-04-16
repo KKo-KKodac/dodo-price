@@ -7,22 +7,16 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입", layout="wide")
 
-# --- CSS: 사진의 문제점(높이 불균형, 버튼 치우침) 해결 ---
+# --- CSS: 버튼 깨짐 방지 및 정렬 최적화 ---
 st.markdown("""
     <style>
-    /* 1. 상단 입력창 높이 검색창에 맞춰 통일 (사진 1 해결) */
-    div[data-baseweb="select"] > div {
-        height: 42px !important;
-        min-height: 42px !important;
-        display: flex;
-        align-items: center;
-    }
-    div[data-baseweb="input"] > div {
+    /* 1. 상단 입력창 높이 통일 */
+    div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
         height: 42px !important;
         min-height: 42px !important;
     }
 
-    /* 2. 테이블 헤더 스타일 및 구분선 */
+    /* 2. 테이블 헤더 스타일 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 10px 0; font-weight: bold; border-radius: 4px; text-align: center;
@@ -31,33 +25,33 @@ st.markdown("""
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
     
-    /* 3. 담기 버튼 정중앙 정렬 (사진 2 해결) */
-    [data-testid="column"]:nth-child(4) {
+    /* 3. 담기 버튼 및 금액 정중앙 정렬 */
+    [data-testid="column"]:nth-child(3), [data-testid="column"]:nth-child(4) {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
-        text-align: center !important;
     }
     
+    /* 4. 초기화/저장 버튼 글자 깨짐 방지 (최소 너비 설정) */
     .stButton > button {
+        min-width: 120px !important; /* 버튼이 너무 좁아지지 않게 고정 */
+        border-radius: 8px !important;
+    }
+    
+    /* + 버튼 전용 사이즈 */
+    div.stButton > button[p-index="plus"] {
         width: 35px !important;
+        min-width: 35px !important;
         height: 35px !important;
         padding: 0 !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        margin: 0 auto !important;
     }
 
-    /* 4. 금액 강조 및 가독성 */
     .price-text { color: red; font-weight: bold; margin: 0; width: 100%; text-align: center; font-size: 15px; }
-    
-    /* 전체 여백 조절 */
     .block-container { padding-top: 2rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 데이터 수집 함수 (SyntaxError 방지를 위해 URL 리스트 정밀 수정) ---
+# --- 데이터 수집 함수 ---
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -101,22 +95,17 @@ def fetch_data():
     all_rows = []
     for url in URLS:
         try:
-            res = requests.get(url, timeout=5)
-            res.encoding = "utf-8"
-            soup = BeautifulSoup(res.text, "html.parser")
-            rows = soup.select("tr")
+            res = requests.get(url, timeout=5); res.encoding = "utf-8"
+            soup = BeautifulSoup(res.text, "html.parser"); rows = soup.select("tr")
             for row in rows:
-                c = row.find("td", class_="price_table_ctgry_nm")
-                n = row.find("td", class_="price_table_prduct_nm")
-                p = row.find("td", class_="price_table_prduct_pc")
+                c, n, p = row.find("td", class_="price_table_ctgry_nm"), row.find("td", class_="price_table_prduct_nm"), row.find("td", class_="price_table_prduct_pc")
                 if c and n and p:
                     price_num = int(re.sub(r'[^0-9]', '', p.text))
-                    if price_num > 0:
-                        all_rows.append({"분류": c.text.strip(), "상품명": n.text.strip(), "매입가": price_num})
+                    if price_num > 0: all_rows.append({"분류": c.text.strip(), "상품명": n.text.strip(), "매입가": price_num})
         except: continue
     return pd.DataFrame(all_rows)
 
-# --- 세션 상태 ---
+# --- 세션 관리 ---
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
 if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
 for i in range(6):
@@ -135,11 +124,11 @@ def reset_calc():
         st.session_state[f"nm_{i}"] = ""
         st.session_state[f"pr_{i}"] = 0
 
-# --- 앱 실행 ---
+# --- 실행 ---
 df = fetch_data()
 st.title("💻 DODO 매입 조회")
 
-# 상단 레이아웃 (사진 1 해결: 높이 통일)
+# 상단 입력창
 sc1, sc2, _ = st.columns([1, 1.5, 1]) 
 with sc1: cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
 with sc2: query = st.text_input("검색", placeholder="상품명 입력", label_visibility="collapsed")
@@ -148,22 +137,24 @@ f_df = df.copy()
 if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 결과 테이블
+# 조회 테이블 헤더
 st.write(f"조회 결과: {len(f_df)}건")
-st.markdown("""<div class="table-header"><div class="header-item" style="flex:1.2;">분류</div><div class="header-item" style="flex:4;">상품명</div><div class="header-item" style="flex:2.2;">매입가</div><div class="header-item" style="flex:1.0; border-right:none;">담기</div></div>""", unsafe_allow_html=True)
+st.markdown("""<div class="table-header"><div class="header-item" style="flex:1.2;">분류</div><div class="header-item" style="flex:4;">상품명</div><div class="header-item" style="flex:2.2;">금액</div><div class="header-item" style="flex:1.0; border-right:none;">담기</div></div>""", unsafe_allow_html=True)
 
 with st.container(height=400):
     for i, row in f_df.iterrows():
         cols = st.columns([1.2, 4, 2.2, 1.0])
         cols[0].markdown(f"<div style='text-align:center; color:gray; font-size:13px;'>{row['분류']}</div>", unsafe_allow_html=True)
         cols[1].write(row['상품명'])
-        cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
-        # CSS에 의해 이 버튼은 정중앙에 배치됩니다.
-        cols[3].button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
+        cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}</p>", unsafe_allow_html=True)
+        # + 버튼이 찌그러지지 않도록 별도 스타일 속성 부여
+        if cols[3].button("➕", key=f"add_{i}"):
+            add_to_calc(row['상품명'], row['매입가'])
+            st.rerun()
 
 st.divider()
 
-# 계산기 영역
+# 하단 계산기
 st.subheader("🛒 매입 계산기")
 st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
@@ -172,12 +163,16 @@ cal_cols = st.columns(2)
 for i in range(6):
     with cal_cols[i % 2]:
         st.write(f"**{labels[i]}**")
-        st.text_input(f"항목{i}", key=f"nm_{i}", label_visibility="collapsed")
-        p_in = st.number_input(f"가격{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+        st.text_input(f"n{i}", key=f"nm_{i}", label_visibility="collapsed")
+        p_in = st.number_input(f"p{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
         total_sum += p_in
 
 st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
-b1, b2 = st.columns(2)
-b1.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_calc)
-res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{i}"] for i in range(6)], "금액": [st.session_state[f"pr_{i}"] for i in range(6)]})
-b2.download_button("💾 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
+
+# 문제의 버튼 영역: 간격을 위해 여백 컬럼 배치
+b_col1, b_col2, b_spacer = st.columns([1, 1, 2])
+with b_col1:
+    st.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_calc)
+with b_col2:
+    res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{i}"] for i in range(6)], "금액": [st.session_state[f"pr_{i}"] for i in range(6)]})
+    st.download_button("💾 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
