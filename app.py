@@ -5,7 +5,7 @@ import pandas as pd
 import re
 
 # 1. 페이지 설정
-st.set_page_config(page_title="꼬꼬닥'S 컴퓨터 매입계산기", layout="wide")
+st.set_page_config(page_title="컴퓨터 매입계산기", layout="wide")
 
 # 2. CSS 스타일: 구분선, 정렬, 버튼 디자인
 st.markdown("""
@@ -116,7 +116,7 @@ def reset_calc():
     st.session_state['target_idx'] = 0
 
 # --- 화면 구성 시작 ---
-st.title("💻 컴퓨터매입계산기")
+st.title("🐔꼬꼬닥'S 컴퓨터 매입계산기🖥️")
 
 if st.button("🔄 시세 DB 갱신", type="primary"):
     st.cache_data.clear()
