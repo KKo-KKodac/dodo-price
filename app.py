@@ -5,9 +5,9 @@ import pandas as pd
 import re
 
 # 1. 페이지 설정
-st.set_page_config(page_title="컴퓨터매입계산기", layout="wide")
+st.set_page_config(page_title="꼬꼬닥'S 컴퓨터 매입계산기", layout="wide")
 
-# 2. CSS 최적화: 구분선 및 정렬 스타일
+# 2. CSS 스타일: 구분선, 정렬, 버튼 디자인
 st.markdown("""
     <style>
     div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, .stButton > button {
@@ -17,6 +17,7 @@ st.markdown("""
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         display: block; max-width: 100%;
     }
+    /* 테이블 헤더 세로 구분선 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 12px 0; font-weight: bold; border-radius: 4px; text-align: center;
@@ -25,9 +26,11 @@ st.markdown("""
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
     
+    /* 본문 중앙 정렬 및 세로선 */
     .cell-center { text-align: center; display: flex; align-items: center; justify-content: center; height: 40px; border-right: 1px solid #f0f2f6; }
     .cell-left { display: flex; align-items: center; padding-left: 10px; height: 40px; border-right: 1px solid #f0f2f6; }
     
+    /* 담기 버튼 스타일 */
     div.stButton > button[key^="add_"] {
         width: 35px !important; min-width: 35px !important; height: 35px !important; 
         border-radius: 50% !important; padding: 0 !important; font-size: 14px !important;
@@ -37,7 +40,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 수집 함수
+# 3. 데이터 수집 (캐시 적용)
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -92,7 +95,9 @@ def fetch_data():
     return pd.DataFrame(all_rows)
 
 # 4. 세션 상태 관리
+# 정해진 라디오 버튼 순서
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
+
 if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
 for i in range(6):
     if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
@@ -102,6 +107,7 @@ def add_to_calc(name, price):
     idx = st.session_state['target_idx']
     st.session_state[f"nm_{idx}"] = name
     st.session_state[f"pr_{idx}"] = price
+    # 담은 후 다음 항목으로 자동 이동 (6개 이후엔 다시 0번으로)
     st.session_state['target_idx'] = (idx + 1) % 6
 
 def reset_calc():
@@ -109,20 +115,21 @@ def reset_calc():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# --- UI 구성 ---
+# --- 화면 구성 시작 ---
 st.title("💻 컴퓨터매입계산기")
 
 if st.button("🔄 시세 DB 갱신", type="primary"):
     st.cache_data.clear()
     st.rerun()
 
-st.write("")
+st.divider()
 
+# 상단 검색 영역
 df = fetch_data()
-col_cat, col_search = st.columns([1, 2.5])
-with col_cat:
+c_cat, c_search = st.columns([1, 2.5])
+with c_cat:
     cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
-with col_search:
+with c_search:
     query = st.text_input("검색", placeholder="상품명 입력", label_visibility="collapsed")
 
 f_df = df.copy()
@@ -139,7 +146,7 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-with st.container(height=400):
+with st.container(height=380):
     for i, row in f_df.iterrows():
         cols = st.columns([1, 2.5, 1.5, 0.8])
         cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
@@ -150,27 +157,30 @@ with st.container(height=400):
 
 st.divider()
 
-# --- 하단 계산기 (순서 정렬 완료) ---
+# --- 하단 계산기 (라디오 버튼 순서와 100% 동일하게 정렬) ---
 st.subheader("🛒 매입 계산 리스트")
+
+# 1. 라디오 버튼
 st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
+# 2. 계산기 입력창 (라디오 버튼 순서대로 위에서 아래로 배치)
 total_sum = 0
-# 라디오 버튼의 순서(CPU, 메인보드...)대로 2열 배치
-cal_cols = st.columns(2)
 for i in range(6):
-    # i=0(CPU), i=1(메인보드)... 순서대로 배치됨
-    with cal_cols[i % 2]:
-        st.write(f"**{labels[i]}**")
-        st.text_input(f"name_{i}", key=f"nm_{i}", label_visibility="collapsed")
-        st.number_input(f"price_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
-        total_sum += st.session_state[f"pr_{i}"]
+    # 라디오 버튼 순서(CPU -> 메인보드 -> 메모리...)에 맞춰 한 줄씩 생성
+    st.write(f"**{labels[i]}**")
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        st.text_input(f"모델명_{i}", key=f"nm_{i}", label_visibility="collapsed", placeholder=f"{labels[i]} 모델명")
+    with c2:
+        st.number_input(f"금액_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+    total_sum += st.session_state[f"pr_{i}"]
 
 st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
 
-# 하단 버튼
+# 하단 공통 버튼
 b_col1, b_col2, _ = st.columns([1.5, 1.5, 2.5])
 with b_col1:
     st.button("🗑️ 계산기 초기화", use_container_width=True, on_click=reset_calc)
 with b_col2:
     res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{k}"] for k in range(6)], "금액": [st.session_state[f"pr_{k}"] for k in range(6)]})
-    st.download_button("💾 CSV 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="purchase_calc.csv", use_container_width=True)
+    st.download_button("💾 CSV 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="purchase_list.csv", use_container_width=True)
