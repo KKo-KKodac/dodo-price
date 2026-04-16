@@ -7,7 +7,7 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입조회", layout="wide")
 
-# --- CSS: 테이블 정렬 및 중앙 정렬 (이전 디자인 유지) ---
+# --- CSS: 테이블 정렬 및 중앙 정렬 ---
 st.markdown("""
     <style>
     .table-header {
@@ -28,7 +28,44 @@ st.markdown("""
 # --- 데이터 수집 ---
 @st.cache_data(ttl=3600)
 def fetch_data():
-    URLS = ["https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4220", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=967", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4221", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4083", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=31", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=993", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=1684", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3682", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3838", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3918", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=25", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4020", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4089", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4137", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4144", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3784", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3775", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3768", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3808", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4075", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4145", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3901", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3902", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4085", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4146", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4218", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3701", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3932", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4021", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4090", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029", "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139"]
+    URLS = [
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4220",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=967",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4221",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4083",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=31",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=993",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=1684",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3682",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3838",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3918",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=25",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4020",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4089",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4137",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4144",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3784",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3775",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3768",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3808",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4075",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4145",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3901",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3902",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4085",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4146",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4218",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3701",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3932",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4021",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4090",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139"
+    ]
     all_rows = []
     for url in URLS:
         try:
@@ -47,34 +84,49 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# --- 세션 관리 (스트림릿 위젯 키 직접 관리 방식) ---
+# --- 세션 상태 초기화 ---
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
 
-# 초기 타겟 인덱스
 if 'target_idx' not in st.session_state: 
     st.session_state['target_idx'] = 0
 
-# 위젯 각각의 고유 키(key)를 세션에 초기화 (이게 핵심입니다!)
 for i in range(6):
     if f"nm_{i}" not in st.session_state:
         st.session_state[f"nm_{i}"] = ""
     if f"pr_{i}" not in st.session_state:
         st.session_state[f"pr_{i}"] = 0
 
-df = fetch_data()
-st.title("💻 DODO 매입")
+# --- 핵심 기능: 버튼 클릭 시 실행될 콜백(Callback) 함수들 ---
+def add_to_calc(name, price):
+    """[+] 버튼을 눌렀을 때 실행되는 함수"""
+    t_idx = st.session_state['target_idx']
+    st.session_state[f"nm_{t_idx}"] = name
+    st.session_state[f"pr_{t_idx}"] = price
+    # 입력 후 다음 칸으로 자동 이동
+    st.session_state['target_idx'] = (t_idx + 1) % 6
 
-# 검색 영역
+def reset_calc():
+    """[초기화] 버튼을 눌렀을 때 실행되는 함수"""
+    st.session_state['target_idx'] = 0
+    for i in range(6):
+        st.session_state[f"nm_{i}"] = ""
+        st.session_state[f"pr_{i}"] = 0
+
+# --- 앱 UI 시작 ---
+df = fetch_data()
+st.title("💻 DODO 매입 대시보드")
+
+# 1. 검색 영역
 sc1, sc2 = st.columns([1, 2])
-with sc1: cat = st.selectbox("분류", ["전체"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
+with sc1: cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
 with sc2: query = st.text_input("검색", placeholder="상품명 입력...", label_visibility="collapsed")
 
 f_df = df.copy()
-if cat != "전체": f_df = f_df[f_df["분류"] == cat]
+if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 1. 헤더 (중앙 정렬 및 구분선 | 추가)
-st.markdown(f"조회 결과: {len(f_df)}건")
+# 2. 조회 결과 테이블 헤더 (구분선 및 중앙 정렬)
+st.write(f"조회 결과: {len(f_df)}건")
 st.markdown("""
     <div class="table-header">
         <div class="header-item" style="flex:1.2;">분류</div>
@@ -84,7 +136,7 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 2. 결과 리스트 (담기 버튼 작동 확실하게 수정)
+# 3. 결과 리스트 출력
 with st.container(height=380):
     for i, row in f_df.iterrows():
         cols = st.columns([1.2, 4, 2.2, 0.8])
@@ -92,28 +144,19 @@ with st.container(height=380):
         cols[1].write(row['상품명'])
         cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
         
-        # ➕ 버튼 클릭 시
-        if cols[3].button("➕", key=f"add_{i}"):
-            t_idx = st.session_state['target_idx']
-            
-            # 리스트가 아니라 '위젯의 키값' 자체를 덮어씌움 (스트림릿 강제 업데이트)
-            st.session_state[f"nm_{t_idx}"] = row['상품명']
-            st.session_state[f"pr_{t_idx}"] = row['매입가']
-            
-            # 다음 칸으로 이동
-            st.session_state['target_idx'] = (t_idx + 1) % 6 
-            st.rerun()
+        # [+] 버튼에 on_click 콜백 연결
+        cols[3].button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
 
 st.divider()
 
-# 3. 매입 계산기
+# 4. 매입 계산기
 st.subheader("🛒 매입 계산기")
 
-# 데이터를 입력할 위치 선택 (라디오 버튼)
-st.session_state['target_idx'] = st.radio("데이터를 입력할 항목을 선택하세요:", range(6), 
-                                        format_func=lambda x: labels[x], 
-                                        index=st.session_state['target_idx'],
-                                        horizontal=True)
+# 라디오 버튼 (key 속성을 사용하여 session_state['target_idx']와 실시간 자동 연동)
+st.radio("데이터를 입력할 항목을 선택하세요:", range(6), 
+         format_func=lambda x: labels[x], 
+         key="target_idx",
+         horizontal=True)
 
 total_sum = 0
 cal_cols = st.columns(2)
@@ -121,29 +164,23 @@ for i in range(6):
     with cal_cols[i % 2]:
         st.write(f"**{labels[i]}**")
         
-        # value 속성을 지우고 key만 남김 (session_state와 자동 동기화됨)
-        n_in = st.text_input(f"n{i}", key=f"nm_{i}", label_visibility="collapsed")
+        # 입력창의 key가 session_state와 완벽히 연동됨 (value 속성 불필요)
+        st.text_input(f"n{i}", key=f"nm_{i}", label_visibility="collapsed")
         p_in = st.number_input(f"p{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
         
         total_sum += p_in
 
-st.markdown(f"### 💰 합계: <span style='color:red;'>{total_sum:,}원</span>", unsafe_allow_html=True)
+st.markdown(f"### 💰 최종 합계: <span style='color:red;'>{total_sum:,}원</span>", unsafe_allow_html=True)
 
-# 4. 하단 제어 (초기화 완벽 작동)
+# 5. 하단 제어 버튼
 b1, b2 = st.columns(2)
 
-# 🗑️ 초기화 버튼 클릭 시
-if b1.button("🗑️ 초기화", use_container_width=True):
-    st.session_state['target_idx'] = 0
-    # 위젯 키값을 전부 강제로 빈칸/0으로 만들어버림
-    for i in range(6):
-        st.session_state[f"nm_{i}"] = ""
-        st.session_state[f"pr_{i}"] = 0
-    st.rerun()
+# [초기화] 버튼에 on_click 콜백 연결
+b1.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_calc)
 
-# CSV 저장용 데이터 추출
+# CSV 저장
 res_names = [st.session_state[f"nm_{i}"] for i in range(6)]
 res_prices = [st.session_state[f"pr_{i}"] for i in range(6)]
 res_df = pd.DataFrame({"항목": labels, "모델": res_names, "금액": res_prices})
 
-b2.download_button("💾 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
+b2.download_button("💾 견적 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo_price.csv", use_container_width=True)
