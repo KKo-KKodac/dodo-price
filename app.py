@@ -7,13 +7,16 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입", layout="wide")
 
-# --- CSS: 버튼 깨짐 및 정렬 보정 ---
+# --- CSS: 모든 디자인 문제 해결 (높이, 중앙정렬, 버튼 깨짐) ---
 st.markdown("""
     <style>
+    /* 1. 상단 입력창 높이 검색창에 맞춰 통일 */
     div[data-baseweb="select"] > div, div[data-baseweb="input"] > div {
         height: 42px !important;
         min-height: 42px !important;
     }
+
+    /* 2. 테이블 헤더 스타일 및 구분선 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 10px 0; font-weight: bold; border-radius: 4px; text-align: center;
@@ -22,13 +25,14 @@ st.markdown("""
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
     
+    /* 3. 담기 버튼 및 리스트 데이터 중앙 정렬 */
     [data-testid="column"]:nth-child(3), [data-testid="column"]:nth-child(4) {
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
     }
     
-    /* 초기화 버튼 글자 깨짐 방지 */
+    /* 4. 초기화 버튼 글자 깨짐 방지 */
     .stButton > button {
         min-width: 110px !important;
         border-radius: 8px !important;
@@ -47,7 +51,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 데이터 수집 ---
+# --- 데이터 수집 함수 (캐시 적용) ---
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -108,10 +112,13 @@ for i in range(6):
     if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
     if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
 
-def add_to_calc(name, price):
+# --- 함수: 담기 버튼 클릭 시 세션에 즉시 반영 ---
+def add_to_calc_callback(name, price):
     t_idx = st.session_state['target_idx']
+    # 입력 대상인 항목에 데이터 강제 주입
     st.session_state[f"nm_{t_idx}"] = name
     st.session_state[f"pr_{t_idx}"] = price
+    # 다음 항목으로 자동 이동
     st.session_state['target_idx'] = (t_idx + 1) % 6
 
 def reset_calc():
@@ -120,11 +127,19 @@ def reset_calc():
         st.session_state[f"pr_{i}"] = 0
     st.session_state['target_idx'] = 0
 
-# --- 메인 로직 ---
+# --- 화면 구성 ---
 df = fetch_data()
-st.title("💻 DODO 매입 조회")
 
-# 상단 검색
+col_title, col_db_btn = st.columns([3, 1])
+with col_title:
+    st.title("💻 DODO 매입 조회")
+with col_db_btn:
+    # DB 새로고침 버튼 (캐시 삭제)
+    if st.button("🔄 시세 DB 가져오기", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
+# 검색 영역
 sc1, sc2, _ = st.columns([1, 1.5, 1]) 
 with sc1: cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
 with sc2: query = st.text_input("검색", placeholder="상품명 입력", label_visibility="collapsed")
@@ -136,30 +151,30 @@ if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 st.write(f"조회 결과: {len(f_df)}건")
 st.markdown("""<div class="table-header"><div class="header-item" style="flex:1.2;">분류</div><div class="header-item" style="flex:4;">상품명</div><div class="header-item" style="flex:2.2;">금액</div><div class="header-item" style="flex:1.0; border-right:none;">담기</div></div>""", unsafe_allow_html=True)
 
+# 리스트 출력
 with st.container(height=350):
     for i, row in f_df.iterrows():
         cols = st.columns([1.2, 4, 2.2, 1.0])
         cols[0].markdown(f"<div style='text-align:center; color:gray; font-size:12px;'>{row['분류']}</div>", unsafe_allow_html=True)
         cols[1].write(row['상품명'])
         cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}</p>", unsafe_allow_html=True)
-        if cols[3].button("➕", key=f"add_{i}"):
-            add_to_calc(row['상품명'], row['매입가'])
-            st.rerun()
+        # 콜백 함수를 사용하여 데이터 유실 방지
+        cols[3].button("➕", key=f"add_{i}", on_click=add_to_calc_callback, args=(row['상품명'], row['매ip가']))
 
 st.divider()
 
-# --- 계산기 영역 (데이터 사라짐 방지 적용) ---
+# --- 계산기 영역 (핵심: on_change 없이 key만 활용) ---
 st.subheader("🛒 매입 계산기")
-st.radio("입력 대상 항목:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
+st.radio("입력 대상 항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
 total_sum = 0
 cal_cols = st.columns(2)
 for i in range(6):
     with cal_cols[i % 2]:
         st.write(f"**{labels[i]}**")
-        # key를 세션 키와 동일하게 설정하여 상태를 직접 동기화
-        st.text_input(f"모델명_{i}", key=f"nm_{i}", label_visibility="collapsed")
-        st.number_input(f"금액_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+        # key를 세션 키와 완전히 일치시켜 직접 제어
+        st.text_input(f"model_{i}", key=f"nm_{i}", label_visibility="collapsed")
+        st.number_input(f"price_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
         total_sum += st.session_state[f"pr_{i}"]
 
 st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
