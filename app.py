@@ -69,59 +69,107 @@ def fetch_data():
                             "상품명": n.text.strip(),
                             "매입가": price_num
                         })
-        except:
-            continue
+        except: continue
     return pd.DataFrame(all_rows)
 
+# --- 상태 관리 (상태 유지용) ---
+if 'calc_data' not in st.session_state:
+    st.session_state['calc_data'] = {i: {"name": "", "price": 0} for i in range(6)}
+if 'next_idx' not in st.session_state:
+    st.session_state['next_idx'] = 0
+
+def add_to_calc(name, price):
+    idx = st.session_state['next_idx']
+    st.session_state['calc_data'][idx] = {"name": name, "price": price}
+    # 다음 인덱스로 이동 (0~5 순환)
+    st.session_state['next_idx'] = (idx + 1) % 6
+
+def reset_calc():
+    st.session_state['calc_data'] = {i: {"name": "", "price": 0} for i in range(6)}
+    st.session_state['next_idx'] = 0
+
 # --- 메인 화면 구성 ---
-st.title("💻 DODO 매입가 조회 웹")
+st.title("💻 DODO 매입가 조회 & 견적기")
 
-if st.button("🔄 데이터 불러오기/새로고침"):
-    st.cache_data.clear()
-    st.session_state['df'] = fetch_data()
+# 상단 버튼 레이아웃
+t_col1, t_col2 = st.columns([1, 6])
+with t_col1:
+    if st.button("🔄 DB 갱신"):
+        st.cache_data.clear()
+        st.session_state['df'] = fetch_data()
 
-if 'df' not in st.session_state:
-    st.info("상단의 '데이터 불러오기' 버튼을 눌러주세요.")
-else:
+if 'df' in st.session_state:
     df = st.session_state['df']
     
-    # 상단 필터 레이아웃
-    col1, col2 = st.columns([1, 2])
-    
-    with col1:
-        # 분류 리스트 가나다순 정렬
+    # 필터 섹션
+    f_col1, f_col2 = st.columns([1, 2])
+    with f_col1:
         categories = ["전체보기"] + sorted(df["분류"].unique().tolist())
-        selected_cat = st.selectbox("📂 분류 선택", categories)
-    
-    with col2:
+        selected_cat = st.selectbox("📂 분류", categories)
+    with f_col2:
         search_query = st.text_input("🔍 상품명 검색")
 
-    # 필터링 적용
     filtered_df = df.copy()
     if selected_cat != "전체보기":
         filtered_df = filtered_df[filtered_df["분류"] == selected_cat]
     if search_query:
         filtered_df = filtered_df[filtered_df["상품명"].str.contains(search_query, case=False)]
 
-    # 데이터 출력
-    st.dataframe(
-        filtered_df.style.format({"매입가": "{:,}"}),
-        use_container_width=True,
-        height=400
-    )
+    # 리스트 출력 (+ 버튼 포함)
+    st.subheader("📋 시세 목록")
+    
+    # 헤더
+    h_col1, h_col2, h_col3, h_col4 = st.columns([1, 4, 1, 1])
+    h_col1.write("**분류**")
+    h_col2.write("**상품명**")
+    h_col3.write("**매입가**")
+    h_col4.write("**추가**")
+    
+    # 데이터 행 (최대 100개만 표시하여 속도 유지)
+    for i, row in filtered_df.head(100).iterrows():
+        r_col1, r_col2, r_col3, r_col4 = st.columns([1, 4, 1, 1])
+        r_col1.write(row['분류'])
+        r_col2.write(row['상품명'])
+        r_col3.write(f"{row['매입가']:,}")
+        if r_col4.button("➕", key=f"btn_{i}"):
+            add_to_calc(row['상품명'], row['매입가'])
+            st.rerun() # 화면 즉시 갱신
 
-    # 견적 계산기 (웹 전용)
+    # 하단 견적 계산기 (고정 영역 느낌)
     st.divider()
     st.subheader("🛒 매입 견적 계산기")
     
-    calc_parts = ["CPU", "메인보드", "램(메모리)", "SSD", "HDD", "그래픽카드"]
-    total_price = 0
+    part_labels = ["CPU", "메인보드", "램(메모리)", "SSD", "HDD", "그래픽카드"]
+    total_sum = 0
     
-    calc_cols = st.columns(2)
-    for i, part in enumerate(calc_parts):
-        with calc_cols[i % 2]:
-            st.text_input(f"{part} 상품명", key=f"name_{i}")
-            price = st.number_input(f"{part} 매입가", min_value=0, step=1000, key=f"price_{i}")
-            total_price += price
+    c_cols = st.columns(2)
+    for i in range(6):
+        with c_cols[i % 2]:
+            st.markdown(f"**{part_labels[i]}**")
+            # session_state와 연결하여 값 유지
+            name_val = st.text_input(f"명칭_{i}", value=st.session_state['calc_data'][i]['name'], label_visibility="collapsed")
+            price_val = st.number_input(f"가격_{i}", value=st.session_state['calc_data'][i]['price'], step=1000, label_visibility="collapsed")
+            
+            # 수동 입력 시에도 데이터 업데이트
+            st.session_state['calc_data'][i]['name'] = name_val
+            st.session_state['calc_data'][i]['price'] = price_val
+            total_sum += price_val
 
-    st.markdown(f"### 💰 총 매입 합계: `{total_price:,}` 원")
+    # 하단 합계 및 버튼
+    b_col1, b_col2, b_col3 = st.columns([2, 1, 1])
+    b_col1.markdown(f"### 💰 총 합계: `{total_sum:,}` 원")
+    if b_col2.button("🗑️ 계산기 초기화", use_container_width=True):
+        reset_calc()
+        st.rerun()
+    
+    # CSV 다운로드 기능
+    csv_data = pd.DataFrame({
+        "구분": part_labels,
+        "상품명": [st.session_state['calc_data'][i]['name'] for i in range(6)],
+        "가격": [f"{st.session_state['calc_data'][i]['price']:,}" for i in range(6)]
+    })
+    csv_res = csv_data.to_csv(index=False).encode('utf-8-sig')
+    b_col3.download_button("💾 CSV 저장", data=csv_res, file_name="매입견적.csv", mime="text/csv", use_container_width=True)
+
+else:
+    st.info("🔄 상단의 'DB 갱신' 버튼을 눌러 시세를 불러와주세요.")
