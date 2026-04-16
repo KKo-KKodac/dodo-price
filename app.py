@@ -7,25 +7,27 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입조회", layout="wide")
 
-# --- 모바일 가로 고정 및 심플 디자인 CSS ---
+# --- CSS: 표 스타일 및 디자인 ---
 st.markdown("""
     <style>
-    /* 모바일 컬럼 꺾임 방지 */
-    [data-testid="column"] { min-width: 0px !important; flex: 1; }
-    div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; flex-wrap: nowrap !important; }
+    /* 테이블 스타일 */
+    .custom-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+    .custom-table th { background-color: #4A90E2; color: white; padding: 10px; text-align: center; }
+    .custom-table td { padding: 8px 5px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .price-text { color: red; font-weight: bold; text-align: right; }
     
-    /* 표 헤더 스타일 */
-    .table-header {
-        display: flex; background-color: #4A90E2; color: white; 
-        padding: 8px 0; font-weight: bold; border-radius: 4px; text-align: center;
-    }
+    /* 모바일 대응: 상품명 칸을 넓게 */
+    .col-cat { width: 60px; text-align: center; color: #888; font-size: 11px; }
+    .col-name { width: auto; }
+    .col-price { width: 80px; text-align: right; }
+    .col-btn { width: 45px; text-align: center; }
     
-    /* 입력창 강조 */
-    .stTextInput input:focus { border-color: #4A90E2 !important; box-shadow: 0 0 5px rgba(74,144,226,0.5); }
+    /* 버튼 스타일 */
+    .stButton>button { width: 100%; padding: 2px !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 데이터 수집 (캐싱 적용으로 빠르게) ---
+# --- 데이터 수집 ---
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -85,84 +87,97 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# --- 세션 상태 초기화 (계산기 데이터) ---
+# --- 세션 관리 ---
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
+
 if 'calc_names' not in st.session_state:
     st.session_state['calc_names'] = [""] * 6
 if 'calc_prices' not in st.session_state:
     st.session_state['calc_prices'] = [0] * 6
-if 'last_focused' not in st.session_state:
-    st.session_state['last_focused'] = 0 # 마지막으로 수정한 입력칸
+if 'cur_idx' not in st.session_state:
+    st.session_state['cur_idx'] = 0
 
-# --- 메인 로직 ---
+# --- 앱 UI ---
 df = fetch_data()
-
 st.title("💻 DODO 매입가")
 
-# 검색 및 필터
-c1, c2 = st.columns([1, 2])
-with c1:
-    cat = st.selectbox("분류", ["전체"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
-with c2:
-    query = st.text_input("검색", placeholder="상품명 입력...", label_visibility="collapsed")
+# 검색바
+sc1, sc2 = st.columns([1, 2])
+with sc1: cat_sel = st.selectbox("분류", ["전체"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
+with sc2: query_sel = st.text_input("검색", placeholder="상품명 입력...", label_visibility="collapsed")
 
-filtered = df.copy()
-if cat != "전체": filtered = filtered[filtered["분류"] == cat]
-if query: filtered = filtered[filtered["상품명"].str.contains(query, case=False)]
+f_df = df.copy()
+if cat_sel != "전체": f_df = f_df[f_df["분류"] == cat_sel]
+if query_sel: f_df = f_df[f_df["상품명"].str.contains(query_sel, case=False)]
 
-# 조회 결과 헤더
-st.markdown(f"**조회 결과: {len(filtered)}건** (입력할 항목을 아래에서 먼저 선택하세요)")
-st.markdown("""<div class="table-header"><div style="flex:2;">분류</div><div style="flex:4; text-align:left; padding-left:10px;">상품명</div><div style="flex:2.5; text-align:right; padding-right:10px;">금액</div><div style="flex:1;">담기</div></div>""", unsafe_allow_html=True)
+# 조회 결과 (헤더 + 스크롤 테이블)
+st.write(f"조회 결과: {len(f_df)}건")
 
-# 리스트 출력 (스크롤)
+# 진짜 테이블 구조 시작
+st.markdown("""
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th class="col-cat">분류</th>
+                <th class="col-name">상품명</th>
+                <th class="col-price">금액</th>
+                <th class="col-btn">담기</th>
+            </tr>
+        </thead>
+    </table>
+""", unsafe_allow_html=True)
+
 with st.container(height=350):
-    for i, row in filtered.iterrows():
-        cols = st.columns([2, 4, 2.5, 1])
+    for i, row in f_df.iterrows():
+        # 데이터 정렬을 위해 st.columns를 사용하되 너비를 강제 조정
+        cols = st.columns([1.2, 4, 1.5, 0.8])
         cols[0].caption(row['분류'])
         cols[1].write(row['상품명'])
-        cols[2].markdown(f"<p style='text-align:right; color:red; font-weight:bold; margin:0;'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
-        if cols[3].button("➕", key=f"add_{i}"):
-            # 포커스된 위치에 값 넣고 다음 칸으로 이동
-            f_idx = st.session_state['last_focused']
-            st.session_state['calc_names'][f_idx] = row['상품명']
-            st.session_state['calc_prices'][f_idx] = row['매입가']
-            st.session_state['last_focused'] = (f_idx + 1) % 6
+        cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}</p>", unsafe_allow_html=True)
+        
+        # 버튼 작동 수정
+        if cols[3].button("➕", key=f"btn_{i}"):
+            idx = st.session_state['cur_idx']
+            st.session_state['calc_names'][idx] = row['상품명']
+            st.session_state['calc_prices'][idx] = row['매입가']
+            # 입력 후 다음 칸으로 이동
+            st.session_state['cur_idx'] = (idx + 1) % 6
             st.rerun()
 
 st.divider()
 
-# --- 계산기 (pyw 방식의 심플함 재현) ---
+# --- 계산기 영역 ---
 st.subheader("🛒 매입 계산기")
-total = 0
-cal_cols = st.columns(2)
+total_sum = 0
+c_cols = st.columns(2)
 
 for i in range(6):
-    with cal_cols[i % 2]:
-        # 항목 라벨 + 현재 포커스 표시
-        indicator = "🔵" if st.session_state['last_focused'] == i else "⚪"
-        st.write(f"{indicator} **{labels[i]}**")
+    with c_cols[i % 2]:
+        focus_mark = "🔵" if st.session_state['cur_idx'] == i else "⚪"
+        st.write(f"{focus_mark} **{labels[i]}**")
         
-        # 입력창: 값을 직접 수정하면 last_focused가 여기로 고정됨
-        name = st.text_input(f"n{i}", value=st.session_state['calc_names'][i], key=f"in_n{i}", label_visibility="collapsed")
-        price = st.number_input(f"p{i}", value=st.session_state['calc_prices'][i], step=1000, key=f"in_p{i}", label_visibility="collapsed")
+        # 이름 입력창
+        n_val = st.text_input(f"n_{i}", value=st.session_state['calc_names'][i], key=f"name_input_{i}", label_visibility="collapsed")
+        # 가격 입력창
+        p_val = st.number_input(f"p_{i}", value=st.session_state['calc_prices'][i], step=1000, key=f"price_input_{i}", label_visibility="collapsed")
         
-        # 값이 바뀌면 현재 포커스를 여기로 업데이트
-        if name != st.session_state['calc_names'][i] or price != st.session_state['calc_prices'][i]:
-            st.session_state['calc_names'][i] = name
-            st.session_state['calc_prices'][i] = price
-            st.session_state['last_focused'] = i
+        # 사용자가 직접 타이핑하면 포커스 이동
+        if n_val != st.session_state['calc_names'][i] or p_val != st.session_state['calc_prices'][i]:
+            st.session_state['calc_names'][i] = n_val
+            st.session_state['calc_prices'][i] = p_val
+            st.session_state['cur_idx'] = i
             
-        total += price
+        total_sum += p_val
 
-st.markdown(f"### 💰 합계: <span style='color:red; font-size:1.4em;'>{total:,}원</span>", unsafe_allow_html=True)
+st.markdown(f"### 💰 합계: <span style='color:red;'>{total_sum:,}원</span>", unsafe_allow_html=True)
 
-# 하단 버튼
+# 하단 제어
 b1, b2 = st.columns(2)
-if b1.button("🗑️ 전체 초기화", use_container_width=True):
+if b1.button("🗑️ 초기화", use_container_width=True):
     st.session_state['calc_names'] = [""] * 6
     st.session_state['calc_prices'] = [0] * 6
-    st.session_state['last_focused'] = 0
+    st.session_state['cur_idx'] = 0
     st.rerun()
 
-csv_data = pd.DataFrame({"항목": labels, "내용": st.session_state['calc_names'], "금액": st.session_state['calc_prices']})
-b2.download_button("💾 CSV 저장", data=csv_data.to_csv(index=False).encode('utf-8-sig'), file_name="dodo_price.csv", use_container_width=True)
+res_df = pd.DataFrame({"부품": labels, "모델": st.session_state['calc_names'], "단가": st.session_state['calc_prices']})
+b2.download_button("💾 CSV 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
