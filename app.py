@@ -7,7 +7,7 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입조회", layout="wide")
 
-# --- CSS: 테이블 정렬 및 중앙 정렬 ---
+# --- CSS: 테이블 정렬 및 중앙 정렬 (이전 디자인 유지) ---
 st.markdown("""
     <style>
     .table-header {
@@ -17,10 +17,6 @@ st.markdown("""
     }
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
-    
-    /* 결과 행 정렬: 헤더와 동일한 flex 비율 사용 */
-    .row-item { display: flex; align-items: center; justify-content: center; text-align: center; }
-    .row-name { justify-content: flex-start; text-align: left; padding-left: 10px; }
     
     [data-testid="column"] { min-width: 0px !important; flex: 1 !important; }
     div[data-testid="stHorizontalBlock"] { gap: 0.2rem !important; flex-wrap: nowrap !important; }
@@ -51,11 +47,19 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# --- 세션 관리 ---
+# --- 세션 관리 (스트림릿 위젯 키 직접 관리 방식) ---
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
-if 'names' not in st.session_state: st.session_state['names'] = [""] * 6
-if 'prices' not in st.session_state: st.session_state['prices'] = [0] * 6
-if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
+
+# 초기 타겟 인덱스
+if 'target_idx' not in st.session_state: 
+    st.session_state['target_idx'] = 0
+
+# 위젯 각각의 고유 키(key)를 세션에 초기화 (이게 핵심입니다!)
+for i in range(6):
+    if f"nm_{i}" not in st.session_state:
+        st.session_state[f"nm_{i}"] = ""
+    if f"pr_{i}" not in st.session_state:
+        st.session_state[f"pr_{i}"] = 0
 
 df = fetch_data()
 st.title("💻 DODO 매입")
@@ -80,27 +84,32 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# 2. 결과 리스트 (중앙 정렬 적용)
+# 2. 결과 리스트 (담기 버튼 작동 확실하게 수정)
 with st.container(height=380):
     for i, row in f_df.iterrows():
         cols = st.columns([1.2, 4, 2.2, 0.8])
         cols[0].markdown(f"<div style='text-align:center; color:gray; font-size:12px;'>{row['분류']}</div>", unsafe_allow_html=True)
         cols[1].write(row['상품명'])
         cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
+        
+        # ➕ 버튼 클릭 시
         if cols[3].button("➕", key=f"add_{i}"):
-            # 타겟 인덱스에 데이터 직접 삽입
             t_idx = st.session_state['target_idx']
-            st.session_state['names'][t_idx] = row['상품명']
-            st.session_state['prices'][t_idx] = row['매입가']
-            st.session_state['target_idx'] = (t_idx + 1) % 6 # 입력 후 다음 칸 자동 이동
+            
+            # 리스트가 아니라 '위젯의 키값' 자체를 덮어씌움 (스트림릿 강제 업데이트)
+            st.session_state[f"nm_{t_idx}"] = row['상품명']
+            st.session_state[f"pr_{t_idx}"] = row['매입가']
+            
+            # 다음 칸으로 이동
+            st.session_state['target_idx'] = (t_idx + 1) % 6 
             st.rerun()
 
 st.divider()
 
-# 3. 매입 계산기 (라디오 버튼으로 타겟 고정)
+# 3. 매입 계산기
 st.subheader("🛒 매입 계산기")
 
-# 어떤 칸에 넣을지 선택하는 라디오 버튼 (이게 있어야 + 버튼이 정확히 작동합니다)
+# 데이터를 입력할 위치 선택 (라디오 버튼)
 st.session_state['target_idx'] = st.radio("데이터를 입력할 항목을 선택하세요:", range(6), 
                                         format_func=lambda x: labels[x], 
                                         index=st.session_state['target_idx'],
@@ -111,23 +120,30 @@ cal_cols = st.columns(2)
 for i in range(6):
     with cal_cols[i % 2]:
         st.write(f"**{labels[i]}**")
-        n_in = st.text_input(f"n{i}", value=st.session_state['names'][i], key=f"nm_{i}", label_visibility="collapsed")
-        p_in = st.number_input(f"p{i}", value=st.session_state['prices'][i], step=1000, key=f"pr_{i}", label_visibility="collapsed")
         
-        # 수동 수정 내용 반영
-        st.session_state['names'][i] = n_in
-        st.session_state['prices'][i] = p_in
+        # value 속성을 지우고 key만 남김 (session_state와 자동 동기화됨)
+        n_in = st.text_input(f"n{i}", key=f"nm_{i}", label_visibility="collapsed")
+        p_in = st.number_input(f"p{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+        
         total_sum += p_in
 
 st.markdown(f"### 💰 합계: <span style='color:red;'>{total_sum:,}원</span>", unsafe_allow_html=True)
 
-# 4. 하단 제어
+# 4. 하단 제어 (초기화 완벽 작동)
 b1, b2 = st.columns(2)
+
+# 🗑️ 초기화 버튼 클릭 시
 if b1.button("🗑️ 초기화", use_container_width=True):
-    st.session_state['names'] = [""] * 6
-    st.session_state['prices'] = [0] * 6
     st.session_state['target_idx'] = 0
+    # 위젯 키값을 전부 강제로 빈칸/0으로 만들어버림
+    for i in range(6):
+        st.session_state[f"nm_{i}"] = ""
+        st.session_state[f"pr_{i}"] = 0
     st.rerun()
 
-res_df = pd.DataFrame({"항목": labels, "모델": st.session_state['names'], "금액": st.session_state['prices']})
+# CSV 저장용 데이터 추출
+res_names = [st.session_state[f"nm_{i}"] for i in range(6)]
+res_prices = [st.session_state[f"pr_{i}"] for i in range(6)]
+res_df = pd.DataFrame({"항목": labels, "모델": res_names, "금액": res_prices})
+
 b2.download_button("💾 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
