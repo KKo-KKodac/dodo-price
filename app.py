@@ -19,7 +19,7 @@ st.markdown("""
         background-color: #f9f9f9;
     }
     </style>
-    """, unsafe_allow_stdio=True)
+    """, unsafe_allow_html=True)
 
 # --- 데이터 수집 함수 (기존과 동일) ---
 URLS = [
