@@ -7,24 +7,16 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="컴퓨터매입계산기", layout="wide")
 
-# 2. CSS 최적화: 구분선 추가 및 중앙 정렬 강화
+# 2. CSS 최적화: 구분선 및 정렬 스타일
 st.markdown("""
     <style>
-    /* 입력창 및 버튼 높이 */
     div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, .stButton > button {
         height: 45px !important; min-height: 45px !important;
     }
-    
-    /* 상품명 말줄임표 처리 */
     .truncate-text {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        display: block;
-        max-width: 100%;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        display: block; max-width: 100%;
     }
-
-    /* 테이블 헤더: 세로 구분선(|) 추가 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 12px 0; font-weight: bold; border-radius: 4px; text-align: center;
@@ -33,17 +25,13 @@ st.markdown("""
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
     
-    /* 본문 데이터 중앙 정렬 및 세로선 */
     .cell-center { text-align: center; display: flex; align-items: center; justify-content: center; height: 40px; border-right: 1px solid #f0f2f6; }
     .cell-left { display: flex; align-items: center; padding-left: 10px; height: 40px; border-right: 1px solid #f0f2f6; }
-    .cell-last { display: flex; align-items: center; justify-content: center; height: 40px; }
-
-    /* 담기 버튼 스타일 */
+    
     div.stButton > button[key^="add_"] {
         width: 35px !important; min-width: 35px !important; height: 35px !important; 
         border-radius: 50% !important; padding: 0 !important; font-size: 14px !important;
     }
-
     .price-text { color: red; font-weight: bold; margin: 0; font-size: 16px; }
     .block-container { padding-top: 1.5rem !important; }
     </style>
@@ -121,7 +109,7 @@ def reset_calc():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# --- 화면 구성 ---
+# --- UI 구성 ---
 st.title("💻 컴퓨터매입계산기")
 
 if st.button("🔄 시세 DB 갱신", type="primary"):
@@ -130,7 +118,6 @@ if st.button("🔄 시세 DB 갱신", type="primary"):
 
 st.write("")
 
-# 검색 필터
 df = fetch_data()
 col_cat, col_search = st.columns([1, 2.5])
 with col_cat:
@@ -142,7 +129,7 @@ f_df = df.copy()
 if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# ★ 테이블 헤더: 구분선(|) 추가 및 비율 조정 ★
+# 테이블 헤더
 st.markdown("""
     <div class="table-header">
         <div class="header-item" style="flex:1;">분류</div>
@@ -155,29 +142,27 @@ st.markdown("""
 with st.container(height=400):
     for i, row in f_df.iterrows():
         cols = st.columns([1, 2.5, 1.5, 0.8])
-        # 분류: 중앙 정렬 및 세로선
         cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
-        # 상품명: 좌측 정렬 및 말줄임표
         cols[1].markdown(f'<div class="cell-left"><span class="truncate-text" title="{row["상품명"]}">{row["상품명"]}</span></div>', unsafe_allow_html=True)
-        # 금액: 중앙 정렬
         cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
-        # 담기 버튼
         with cols[3]:
             st.button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
 
 st.divider()
 
-# 하단 계산기 영역
+# --- 하단 계산기 (순서 정렬 완료) ---
 st.subheader("🛒 매입 계산 리스트")
 st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
 total_sum = 0
+# 라디오 버튼의 순서(CPU, 메인보드...)대로 2열 배치
 cal_cols = st.columns(2)
 for i in range(6):
+    # i=0(CPU), i=1(메인보드)... 순서대로 배치됨
     with cal_cols[i % 2]:
         st.write(f"**{labels[i]}**")
-        st.text_input(f"name_in_{i}", key=f"nm_{i}", label_visibility="collapsed")
-        st.number_input(f"price_in_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+        st.text_input(f"name_{i}", key=f"nm_{i}", label_visibility="collapsed")
+        st.number_input(f"price_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
         total_sum += st.session_state[f"pr_{i}"]
 
 st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
