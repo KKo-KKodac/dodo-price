@@ -7,27 +7,27 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입조회", layout="wide")
 
-# --- CSS: 표 스타일 및 디자인 ---
+# --- CSS: 표 정렬 및 디자인 최적화 ---
 st.markdown("""
     <style>
-    /* 테이블 스타일 */
-    .custom-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
-    .custom-table th { background-color: #4A90E2; color: white; padding: 10px; text-align: center; }
-    .custom-table td { padding: 8px 5px; border-bottom: 1px solid #eee; vertical-align: middle; }
-    .price-text { color: red; font-weight: bold; text-align: right; }
+    /* 테이블 헤더와 데이터 줄 맞춤 */
+    .table-header {
+        display: flex; background-color: #4A90E2; color: white; 
+        padding: 10px 0; font-weight: bold; border-radius: 4px; text-align: center;
+        margin-bottom: 5px;
+    }
+    .header-item { flex: 1; margin: 0 2px; }
     
-    /* 모바일 대응: 상품명 칸을 넓게 */
-    .col-cat { width: 60px; text-align: center; color: #888; font-size: 11px; }
-    .col-name { width: auto; }
-    .col-price { width: 80px; text-align: right; }
-    .col-btn { width: 45px; text-align: center; }
-    
-    /* 버튼 스타일 */
-    .stButton>button { width: 100%; padding: 2px !important; }
+    /* 모바일 가로 유지 */
+    [data-testid="column"] { min-width: 0px !important; flex: 1 !important; }
+    div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; flex-wrap: nowrap !important; }
+
+    /* 금액 텍스트 정렬 */
+    .price-tag { color: red; font-weight: bold; text-align: right; width: 100%; margin: 0; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 데이터 수집 ---
+# --- 데이터 수집 함수 ---
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -87,97 +87,94 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# --- 세션 관리 ---
-labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
+# --- 세션 초기화 ---
+labels = ["CPU", "메보", "메모리", "SSD", "HDD", "그래픽"]
+if 'calc_data' not in st.session_state:
+    st.session_state['calc_data'] = [{"name": "", "price": 0} for _ in range(6)]
+if 'focus_idx' not in st.session_state:
+    st.session_state['focus_idx'] = 0
 
-if 'calc_names' not in st.session_state:
-    st.session_state['calc_names'] = [""] * 6
-if 'calc_prices' not in st.session_state:
-    st.session_state['calc_prices'] = [0] * 6
-if 'cur_idx' not in st.session_state:
-    st.session_state['cur_idx'] = 0
-
-# --- 앱 UI ---
+# --- 앱 UI 시작 ---
 df = fetch_data()
-st.title("💻 DODO 매입가")
+st.title("💻 DODO 매입 대시보드")
 
-# 검색바
-sc1, sc2 = st.columns([1, 2])
-with sc1: cat_sel = st.selectbox("분류", ["전체"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
-with sc2: query_sel = st.text_input("검색", placeholder="상품명 입력...", label_visibility="collapsed")
+# 1. 검색 영역
+c1, c2 = st.columns([1, 2])
+with c1:
+    cat = st.selectbox("분류", ["전체"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
+with c2:
+    query = st.text_input("검색", placeholder="상품명 입력...", label_visibility="collapsed")
 
-f_df = df.copy()
-if cat_sel != "전체": f_df = f_df[f_df["분류"] == cat_sel]
-if query_sel: f_df = f_df[f_df["상품명"].str.contains(query_sel, case=False)]
+filtered = df.copy()
+if cat != "전체": filtered = filtered[filtered["분류"] == cat]
+if query: filtered = filtered[filtered["상품명"].str.contains(query, case=False)]
 
-# 조회 결과 (헤더 + 스크롤 테이블)
-st.write(f"조회 결과: {len(f_df)}건")
-
-# 진짜 테이블 구조 시작
+# 2. 결과 테이블 (줄 맞춤 개선)
+st.write(f"조회 결과: {len(filtered)}건")
 st.markdown("""
-    <table class="custom-table">
-        <thead>
-            <tr>
-                <th class="col-cat">분류</th>
-                <th class="col-name">상품명</th>
-                <th class="col-price">금액</th>
-                <th class="col-btn">담기</th>
-            </tr>
-        </thead>
-    </table>
+    <div class="table-header">
+        <div style="flex:1.2;">분류</div>
+        <div style="flex:4; text-align:left; padding-left:10px;">상품명</div>
+        <div style="flex:2.2; text-align:right; padding-right:15px;">금액</div>
+        <div style="flex:0.8;">담기</div>
+    </div>
 """, unsafe_allow_html=True)
 
 with st.container(height=350):
-    for i, row in f_df.iterrows():
-        # 데이터 정렬을 위해 st.columns를 사용하되 너비를 강제 조정
-        cols = st.columns([1.2, 4, 1.5, 0.8])
+    for i, row in filtered.iterrows():
+        cols = st.columns([1.2, 4, 2.2, 0.8])
         cols[0].caption(row['분류'])
         cols[1].write(row['상품명'])
-        cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}</p>", unsafe_allow_html=True)
-        
-        # 버튼 작동 수정
-        if cols[3].button("➕", key=f"btn_{i}"):
-            idx = st.session_state['cur_idx']
-            st.session_state['calc_names'][idx] = row['상품명']
-            st.session_state['calc_prices'][idx] = row['매입가']
-            # 입력 후 다음 칸으로 이동
-            st.session_state['cur_idx'] = (idx + 1) % 6
+        cols[2].markdown(f"<p class='price-tag'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
+        # 담기 버튼 로직
+        if cols[3].button("➕", key=f"add_{i}"):
+            f_idx = st.session_state['focus_idx']
+            st.session_state['calc_data'][f_idx] = {"name": row['상품명'], "price": row['매입가']}
+            st.session_state['focus_idx'] = (f_idx + 1) % 6
             st.rerun()
 
 st.divider()
 
-# --- 계산기 영역 ---
+# 3. 계산기 영역
 st.subheader("🛒 매입 계산기")
-total_sum = 0
-c_cols = st.columns(2)
+total = 0
+cal_cols = st.columns(2)
 
 for i in range(6):
-    with c_cols[i % 2]:
-        focus_mark = "🔵" if st.session_state['cur_idx'] == i else "⚪"
-        st.write(f"{focus_mark} **{labels[i]}**")
+    with cal_cols[i % 2]:
+        # 현재 선택된 칸 강조
+        is_focused = st.session_state['focus_idx'] == i
+        btn_label = f"👉 {labels[i]}" if is_focused else f"📍 {labels[i]}"
         
-        # 이름 입력창
-        n_val = st.text_input(f"n_{i}", value=st.session_state['calc_names'][i], key=f"name_input_{i}", label_visibility="collapsed")
-        # 가격 입력창
-        p_val = st.number_input(f"p_{i}", value=st.session_state['calc_prices'][i], step=1000, key=f"price_input_{i}", label_visibility="collapsed")
-        
-        # 사용자가 직접 타이핑하면 포커스 이동
-        if n_val != st.session_state['calc_names'][i] or p_val != st.session_state['calc_prices'][i]:
-            st.session_state['calc_names'][i] = n_val
-            st.session_state['calc_prices'][i] = p_val
-            st.session_state['cur_idx'] = i
+        # 칸 선택 버튼 (클릭하면 커서가 여기로 옴)
+        if st.button(btn_label, key=f"focus_btn_{i}", use_container_width=True):
+            st.session_state['focus_idx'] = i
+            st.rerun()
             
-        total_sum += p_val
+        # 입력창 (값 연동)
+        name_val = st.text_input(f"n{i}", value=st.session_state['calc_data'][i]['name'], key=f"input_n{i}", label_visibility="collapsed")
+        price_val = st.number_input(f"p{i}", value=st.session_state['calc_data'][i]['price'], step=1000, key=f"input_p{i}", label_visibility="collapsed")
+        
+        # 수동 수정 시 세션 반영
+        st.session_state['calc_data'][i]['name'] = name_val
+        st.session_state['calc_data'][i]['price'] = price_val
+        total += price_val
 
-st.markdown(f"### 💰 합계: <span style='color:red;'>{total_sum:,}원</span>", unsafe_allow_html=True)
+st.markdown(f"### 💰 합계: <span style='color:red; font-size:1.5em;'>{total:,}원</span>", unsafe_allow_html=True)
 
-# 하단 제어
-b1, b2 = st.columns(2)
-if b1.button("🗑️ 초기화", use_container_width=True):
-    st.session_state['calc_names'] = [""] * 6
-    st.session_state['calc_prices'] = [0] * 6
-    st.session_state['cur_idx'] = 0
+# 4. 제어 버튼
+b_reset, b_csv = st.columns(2)
+
+# 초기화 버튼 수정
+if b_reset.button("🗑️ 전체 초기화", use_container_width=True):
+    st.session_state['calc_data'] = [{"name": "", "price": 0} for _ in range(6)]
+    st.session_state['focus_idx'] = 0
     st.rerun()
 
-res_df = pd.DataFrame({"부품": labels, "모델": st.session_state['calc_names'], "단가": st.session_state['calc_prices']})
-b2.download_button("💾 CSV 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
+# 저장 버튼
+out_df = pd.DataFrame({
+    "항목": labels, 
+    "모델명": [item['name'] for item in st.session_state['calc_data']], 
+    "매입가": [f"{item['price']:,}" for item in st.session_state['calc_data']]
+})
+b_csv.download_button("💾 CSV 저장", data=out_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo_price.csv", use_container_width=True)
