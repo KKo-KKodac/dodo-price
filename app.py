@@ -32,7 +32,6 @@ st.markdown("""
     .header-item:last-child { border-right: none; }
     
     /* 3. 담기 버튼 정중앙 정렬 (사진 2 해결) */
-    /* 버튼이 들어가는 마지막 컬럼(Column)의 정렬 강제 지정 */
     [data-testid="column"]:nth-child(4) {
         display: flex !important;
         justify-content: center !important;
@@ -40,7 +39,6 @@ st.markdown("""
         text-align: center !important;
     }
     
-    /* 버튼 자체 사이즈 및 여백 제거 */
     .stButton > button {
         width: 35px !important;
         height: 35px !important;
@@ -59,7 +57,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 데이터 수집 함수 ---
+# --- 데이터 수집 함수 (SyntaxError 방지를 위해 URL 리스트 정밀 수정) ---
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -90,4 +88,96 @@ def fetch_data():
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4145",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3901",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3902",
-        "
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4085",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4146",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4218",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3701",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3932",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4021",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4090",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139"
+    ]
+    all_rows = []
+    for url in URLS:
+        try:
+            res = requests.get(url, timeout=5)
+            res.encoding = "utf-8"
+            soup = BeautifulSoup(res.text, "html.parser")
+            rows = soup.select("tr")
+            for row in rows:
+                c = row.find("td", class_="price_table_ctgry_nm")
+                n = row.find("td", class_="price_table_prduct_nm")
+                p = row.find("td", class_="price_table_prduct_pc")
+                if c and n and p:
+                    price_num = int(re.sub(r'[^0-9]', '', p.text))
+                    if price_num > 0:
+                        all_rows.append({"분류": c.text.strip(), "상품명": n.text.strip(), "매입가": price_num})
+        except: continue
+    return pd.DataFrame(all_rows)
+
+# --- 세션 상태 ---
+labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
+if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
+for i in range(6):
+    if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
+    if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
+
+def add_to_calc(name, price):
+    t_idx = st.session_state['target_idx']
+    st.session_state[f"nm_{t_idx}"] = name
+    st.session_state[f"pr_{t_idx}"] = price
+    st.session_state['target_idx'] = (t_idx + 1) % 6
+
+def reset_calc():
+    st.session_state['target_idx'] = 0
+    for i in range(6): 
+        st.session_state[f"nm_{i}"] = ""
+        st.session_state[f"pr_{i}"] = 0
+
+# --- 앱 실행 ---
+df = fetch_data()
+st.title("💻 DODO 매입 조회")
+
+# 상단 레이아웃 (사진 1 해결: 높이 통일)
+sc1, sc2, _ = st.columns([1, 1.5, 1]) 
+with sc1: cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
+with sc2: query = st.text_input("검색", placeholder="상품명 입력", label_visibility="collapsed")
+
+f_df = df.copy()
+if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
+if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
+
+# 결과 테이블
+st.write(f"조회 결과: {len(f_df)}건")
+st.markdown("""<div class="table-header"><div class="header-item" style="flex:1.2;">분류</div><div class="header-item" style="flex:4;">상품명</div><div class="header-item" style="flex:2.2;">매입가</div><div class="header-item" style="flex:1.0; border-right:none;">담기</div></div>""", unsafe_allow_html=True)
+
+with st.container(height=400):
+    for i, row in f_df.iterrows():
+        cols = st.columns([1.2, 4, 2.2, 1.0])
+        cols[0].markdown(f"<div style='text-align:center; color:gray; font-size:13px;'>{row['분류']}</div>", unsafe_allow_html=True)
+        cols[1].write(row['상품명'])
+        cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
+        # CSS에 의해 이 버튼은 정중앙에 배치됩니다.
+        cols[3].button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
+
+st.divider()
+
+# 계산기 영역
+st.subheader("🛒 매입 계산기")
+st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
+
+total_sum = 0
+cal_cols = st.columns(2)
+for i in range(6):
+    with cal_cols[i % 2]:
+        st.write(f"**{labels[i]}**")
+        st.text_input(f"항목{i}", key=f"nm_{i}", label_visibility="collapsed")
+        p_in = st.number_input(f"가격{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+        total_sum += p_in
+
+st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
+b1, b2 = st.columns(2)
+b1.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_calc)
+res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{i}"] for i in range(6)], "금액": [st.session_state[f"pr_{i}"] for i in range(6)]})
+b2.download_button("💾 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
