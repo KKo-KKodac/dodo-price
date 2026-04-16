@@ -7,35 +7,23 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입", layout="wide")
 
-# --- CSS: 아이폰 가독성 및 레이아웃 교정 ---
+# --- CSS: 표준 정렬 및 가독성 확보 ---
 st.markdown("""
     <style>
-    /* 1. 전체 여백 제거 (가장 중요) */
-    .block-container { padding: 10px 10px !important; }
-    
-    /* 2. 분류/검색창 한 줄 배치 시 짤림 방지 */
-    div[data-testid="stHorizontalBlock"] {
-        gap: 5px !important; flex-wrap: nowrap !important;
-    }
-    
-    /* 3. 테이블 헤더: 글자 크기 복구 (가독성) */
+    /* 헤더 중앙 정렬 및 구분선 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 10px 0; font-weight: bold; border-radius: 4px; text-align: center;
-        font-size: 13px; margin-bottom: 5px;
+        margin-bottom: 5px;
     }
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
     
-    /* 4. 결과 리스트 높이 및 폰트 조절 */
-    .row-item { font-size: 13px !important; }
-    .price-text { color: red; font-weight: bold; text-align: center; font-size: 12px; }
+    /* 금액 텍스트 강조 */
+    .price-text { color: red; font-weight: bold; margin: 0; width: 100%; text-align: center; }
     
-    /* 5. 버튼 크기 최적화 */
-    .stButton button { padding: 2px 10px !important; height: auto !important; }
-
-    /* 6. 모바일에서 입력창이 커보이도록 조정 */
-    input { font-size: 14px !important; }
+    /* 기본 여백 복구 */
+    .block-container { padding-top: 2rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -46,23 +34,32 @@ def fetch_data():
     all_rows = []
     for url in URLS:
         try:
-            res = requests.get(url, timeout=5); res.encoding = "utf-8"
-            soup = BeautifulSoup(res.text, "html.parser"); rows = soup.select("tr")
+            res = requests.get(url, timeout=5)
+            res.encoding = "utf-8"
+            soup = BeautifulSoup(res.text, "html.parser")
+            rows = soup.select("tr")
             for row in rows:
-                c, n, p = row.find("td", class_="price_table_ctgry_nm"), row.find("td", class_="price_table_prduct_nm"), row.find("td", class_="price_table_prduct_pc")
+                c = row.find("td", class_="price_table_ctgry_nm")
+                n = row.find("td", class_="price_table_prduct_nm")
+                p = row.find("td", class_="price_table_prduct_pc")
                 if c and n and p:
                     price_num = int(re.sub(r'[^0-9]', '', p.text))
-                    if price_num > 0: all_rows.append({"분류": c.text.strip(), "상품명": n.text.strip(), "매입가": price_num})
+                    if price_num > 0:
+                        all_rows.append({"분류": c.text.strip(), "상품명": n.text.strip(), "매입가": price_num})
         except: continue
     return pd.DataFrame(all_rows)
 
-# --- 세션 관리 ---
-labels = ["CPU", "MB", "RAM", "SSD", "HDD", "VGA"]
-if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
+# --- 세션 상태 관리 ---
+labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
+
+if 'target_idx' not in st.session_state: 
+    st.session_state['target_idx'] = 0
+
 for i in range(6):
     if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
     if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
 
+# --- 콜백 함수 (데이터 담기 및 초기화) ---
 def add_to_calc(name, price):
     t_idx = st.session_state['target_idx']
     st.session_state[f"nm_{t_idx}"] = name
@@ -71,35 +68,48 @@ def add_to_calc(name, price):
 
 def reset_calc():
     st.session_state['target_idx'] = 0
-    for i in range(6): st.session_state[f"nm_{i}"] = ""; st.session_state[f"pr_{i}"] = 0
+    for i in range(6):
+        st.session_state[f"nm_{i}"] = ""
+        st.session_state[f"pr_{i}"] = 0
 
-# --- 앱 실행 ---
+# --- 화면 구성 ---
 df = fetch_data()
+st.title("💻 DODO 매입 대시보드")
 
-# 분류/검색창 (가로 배치 최적화)
-c1, c2 = st.columns([1, 1.2])
-with c1: cat = st.selectbox("분류", ["전체"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
-with c2: query = st.text_input("검색", placeholder="상품명 입력", label_visibility="collapsed")
+# 1. 검색 영역 (PC/모바일 표준)
+sc1, sc2 = st.columns([1, 2])
+with sc1: cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
+with sc2: query = st.text_input("검색", placeholder="상품명 입력...", label_visibility="collapsed")
 
 f_df = df.copy()
-if cat != "전체": f_df = f_df[f_df["분류"] == cat]
+if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 결과 테이블 (글자 크기 키움)
-st.markdown("""<div class="table-header"><div class="header-item" style="flex:1;">분류</div><div class="header-item" style="flex:3;">상품명</div><div class="header-item" style="flex:1.8;">매입가</div><div class="header-item" style="flex:0.7;">+</div></div>""", unsafe_allow_html=True)
+# 2. 결과 테이블 헤더
+st.write(f"조회 결과: {len(f_df)}건")
+st.markdown("""
+    <div class="table-header">
+        <div class="header-item" style="flex:1.2;">분류</div>
+        <div class="header-item" style="flex:4;">상품명</div>
+        <div class="header-item" style="flex:2.2;">매입가</div>
+        <div class="header-item" style="flex:0.8;">담기</div>
+    </div>
+""", unsafe_allow_html=True)
 
-with st.container(height=300):
+# 3. 결과 리스트 (표준 폰트 사이즈)
+with st.container(height=400):
     for i, row in f_df.iterrows():
-        cols = st.columns([1, 3, 1.8, 0.7])
-        cols[0].markdown(f"<div style='text-align:center; font-size:11px; color:#666;'>{row['분류']}</div>", unsafe_allow_html=True)
-        cols[1].markdown(f"<div style='font-size:12px; line-height:1.2;'>{row['상품명']}</div>", unsafe_allow_html=True)
+        cols = st.columns([1.2, 4, 2.2, 0.8])
+        cols[0].markdown(f"<div style='text-align:center; color:gray; font-size:13px;'>{row['분류']}</div>", unsafe_allow_html=True)
+        cols[1].write(row['상품명'])
         cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
-        cols[3].button("➕", key=f"a_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
+        cols[3].button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
 
 st.divider()
 
-# 계산기 영역
-st.radio("입력 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
+# 4. 매입 계산기
+st.subheader("🛒 매입 계산기")
+st.radio("데이터를 입력할 항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
 total_sum = 0
 cal_cols = st.columns(2)
@@ -110,8 +120,15 @@ for i in range(6):
         p_in = st.number_input(f"p{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
         total_sum += p_in
 
-st.markdown(f"### 💰 합계: :red[{total_sum:,}원]")
+st.markdown(f"### 💰 최종 합계: <span style='color:red;'>{total_sum:,}원</span>", unsafe_allow_html=True)
+
+# 5. 제어 버튼
 b1, b2 = st.columns(2)
-b1.button("🗑️ 초기화", use_container_width=True, on_click=reset_calc)
-res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{i}"] for i in range(6)], "금액": [st.session_state[f"pr_{i}"] for i in range(6)]})
-b2.download_button("💾 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
+b1.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_calc)
+
+# 저장 데이터 구성
+res_names = [st.session_state[f"nm_{i}"] for i in range(6)]
+res_prices = [st.session_state[f"pr_{i}"] for i in range(6)]
+res_df = pd.DataFrame({"항목": labels, "모델": res_names, "금액": res_prices})
+
+b2.download_button("💾 견적 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo_price.csv", use_container_width=True)
