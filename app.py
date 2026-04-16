@@ -7,92 +7,68 @@ import re
 # 웹 페이지 설정
 st.set_page_config(page_title="DODO 매입가 조회", layout="wide")
 
-# --- 모바일 최적화 및 스타일 설정 ---
+# --- CSS: 모바일 가로 유지 및 디자인 최적화 ---
 st.markdown("""
     <style>
-    /* 전체 폰트 크기 및 간격 조정 */
-    html, body, [class*="css"] {
-        font-size: 14px;
-    }
+    /* 리스트 영역 폰트 및 간격 */
+    .stText, .stMarkdown p { font-size: 13px !important; margin-bottom: 0px !important; }
     
-    /* 리스트 영역 박스 스타일 */
-    .item-row {
-        display: flex;
-        align-items: center;
-        padding: 10px 0;
-        border-bottom: 1px solid #eee;
-        gap: 5px;
+    /* 헤더 스타일 고정 */
+    .header-box {
+        display: flex; background-color: #f0f2f6; padding: 8px 0;
+        font-weight: bold; border-radius: 4px; text-align: center; margin-bottom: 5px;
     }
-    
-    /* 각 컬럼 너비 고정 (모바일 대응) */
-    .col-cat { flex: 1.5; font-size: 11px; color: #666; overflow: hidden; }
-    .col-name { flex: 4; font-weight: 500; font-size: 13px; }
-    .col-price { flex: 2; text-align: right; font-weight: bold; color: #d32f2f; font-size: 13px; }
-    .col-btn { flex: 1; text-align: center; }
 
-    /* 버튼 스타일 조정 */
-    div.stButton > button {
-        padding: 2px 10px;
-        height: auto;
-        font-size: 12px;
-    }
-    
-    /* 헤더 스타일 */
-    .table-header {
-        display: flex;
-        background-color: #f0f2f6;
-        padding: 10px 0;
-        border-radius: 5px;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 5px;
-        gap: 5px;
-    }
+    /* 모바일에서 컬럼 꺾임 방지 (핵심) */
+    [data-testid="column"] { min-width: 0px !important; flex-shrink: 0 !important; }
+    div[data-testid="stHorizontalBlock"] { gap: 0.5rem !important; }
+
+    /* 활성화된 계산기 입력창 강조 */
+    .active-input { border: 2px solid #ff4b4b !important; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 데이터 수집 함수 (기존과 동일) ---
-URLS = [
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4220",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=967",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4221",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4083",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=31",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=993",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=1684",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3682",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3838",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3918",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=25",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4020",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4089",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4137",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4144",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3784",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3775",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3768",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3808",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4075",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4145",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3901",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3902",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4085",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4146",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4218",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3701",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3932",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4021",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4090",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029",
-    "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139"
-]
-
+# --- 데이터 수집 함수 (기존 동일) ---
 @st.cache_data(show_spinner="시세 로딩 중...")
 def fetch_data():
+    URLS = [
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4220",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=967",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=966&ctgry_no3=4221",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4083",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=31",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=993",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=1684",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3682",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3838",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=3918",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=25",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4020",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4089",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4137",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=9&ctgry_no3=4144",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3784",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3775",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3768",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=3808",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4075",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=58&ctgry_no3=4145",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3901",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=3902",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4085",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4146",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=14&ctgry_no2=59&ctgry_no3=4218",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3701",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=3932",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4021",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4090",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139"
+    ]
     all_rows = []
     headers = {"User-Agent": "Mozilla/5.0"}
     for url in URLS:
@@ -115,18 +91,19 @@ def fetch_data():
 # --- 상태 관리 ---
 if 'calc_data' not in st.session_state:
     st.session_state['calc_data'] = {i: {"name": "", "price": 0} for i in range(6)}
-if 'next_idx' not in st.session_state:
-    st.session_state['next_idx'] = 0
+if 'focus_idx' not in st.session_state:
+    st.session_state['focus_idx'] = 0 # 현재 데이터를 넣을 위치
 
-def add_to_calc(name, price):
-    idx = st.session_state['next_idx']
+def update_focused_item(name, price):
+    idx = st.session_state['focus_idx']
     st.session_state['calc_data'][idx] = {"name": name, "price": price}
-    st.session_state['next_idx'] = (idx + 1) % 6
+    # 입력 후 다음 칸으로 자동 이동 (6칸 순환)
+    st.session_state['focus_idx'] = (idx + 1) % 6
 
-# --- UI 레이아웃 ---
-st.title("📂 DODO 매입가 조회")
+# --- UI 상단 ---
+st.title("📂 DODO 통합 대시보드")
 
-if st.button("🔄 데이터 최신화"):
+if st.button("🔄 시세 새로고침"):
     st.cache_data.clear()
     st.session_state['df'] = fetch_data()
 
@@ -135,9 +112,9 @@ if 'df' in st.session_state:
     
     col_cat, col_src = st.columns([1, 1.5])
     with col_cat:
-        selected_cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()))
+        selected_cat = st.selectbox("분류 필터", ["전체보기"] + sorted(df["분류"].unique().tolist()))
     with col_src:
-        search_query = st.text_input("검색", placeholder="상품명 입력...")
+        search_query = st.text_input("검색", placeholder="상품명을 입력하세요...")
 
     filtered = df.copy()
     if selected_cat != "전체보기":
@@ -145,53 +122,65 @@ if 'df' in st.session_state:
     if search_query:
         filtered = filtered[filtered["상품명"].str.contains(search_query, case=False)]
 
-    st.write(f"**조회 결과: {len(filtered)}건**")
-    
-    # --- 커스텀 HTML 테이블 헤더 ---
+    # --- 테이블 헤더 (HTML) ---
     st.markdown("""
-        <div class="table-header">
-            <div style="flex:1.5;">분류</div>
+        <div class="header-box">
+            <div style="flex:1.8;">분류</div>
             <div style="flex:4; text-align:left; padding-left:10px;">상품명</div>
-            <div style="flex:2; text-align:right;">매입가</div>
+            <div style="flex:2.2; text-align:right; padding-right:10px;">매입가</div>
             <div style="flex:1;">담기</div>
         </div>
     """, unsafe_allow_html=True)
 
-    # --- 스크롤 영역 (HTML/CSS 사용으로 모바일 줄바꿈 방지) ---
-    scroll_area = st.container(height=450)
-    with scroll_area:
+    # --- 조회 결과 리스트 (스크롤 박스) ---
+    with st.container(height=400):
         for i, row in filtered.iterrows():
-            # st.columns 대신 HTML 구조를 사용하여 강제로 가로 배치 유지
-            cols = st.columns([1.5, 4, 2, 1])
+            # 모바일에서도 4열 가로 유지
+            cols = st.columns([1.8, 4, 2.2, 1])
             cols[0].caption(row['분류'])
             cols[1].write(row['상품명'])
-            cols[2].markdown(f"<p style='text-align:right; font-weight:bold; color:red; margin:0;'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
+            cols[2].markdown(f"<p style='text-align:right; font-weight:bold; color:red;'>{row['매입가']:,}원</p>", unsafe_allow_html=True)
             if cols[3].button("➕", key=f"add_{i}"):
-                add_to_calc(row['상품명'], row['매입가'])
+                update_focused_item(row['상품명'], row['매입가'])
                 st.rerun()
 
-    # --- 계산기 영역 ---
+    # --- 견적 계산기 (하단 고정 느낌) ---
     st.divider()
-    st.subheader("🛒 매입 계산기")
+    st.subheader("🛒 매입 견적 계산기")
+    st.info(f"💡 현재 **'{['CPU','메보','RAM','SSD','HDD','VGA'][st.session_state['focus_idx']]}'** 항목이 선택됨. '➕' 누를 시 해당 칸에 입력됩니다.")
+    
     labels = ["CPU", "메보", "RAM", "SSD", "HDD", "VGA"]
     total = 0
     
-    # 계산기도 모바일에서 너무 길지 않게 2열 배치
-    c_cols = st.columns(2)
+    calc_cols = st.columns(2)
     for i in range(6):
-        with c_cols[i % 2]:
-            st.caption(f"📍 {labels[i]}")
-            st.session_state['calc_data'][i]['name'] = st.text_input(f"n_{i}", value=st.session_state['calc_data'][i]['name'], label_visibility="collapsed")
-            st.session_state['calc_data'][i]['price'] = st.number_input(f"p_{i}", value=st.session_state['calc_data'][i]['price'], step=1000, label_visibility="collapsed")
-            total += st.session_state['calc_data'][i]['price']
+        with calc_cols[i % 2]:
+            # 현재 포커스된 항목이면 배경색이나 라벨로 강조
+            label_prefix = "👉 " if st.session_state['focus_idx'] == i else "📍 "
+            if st.button(f"{label_prefix}{labels[i]} 선택하기", key=f"sel_{i}", use_container_width=True):
+                st.session_state['focus_idx'] = i
+                st.rerun()
+            
+            # 수동 입력 가능하도록 구성
+            name_input = st.text_input(f"품명_{i}", value=st.session_state['calc_data'][i]['name'], label_visibility="collapsed")
+            price_input = st.number_input(f"가_{i}", value=st.session_state['calc_data'][i]['price'], step=1000, label_visibility="collapsed")
+            
+            # 세션 상태 업데이트
+            st.session_state['calc_data'][i]['name'] = name_input
+            st.session_state['calc_data'][i]['price'] = price_input
+            total += price_input
 
-    st.markdown(f"### 💵 합계: <span style='color:red'>{total:,}원</span>", unsafe_allow_html=True)
+    st.markdown(f"### 💰 최종 합계: <span style='color:red; font-size:1.5em;'>{total:,}원</span>", unsafe_allow_html=True)
     
-    b1, b2 = st.columns(2)
-    if b1.button("🗑️ 초기화", use_container_width=True):
+    b_reset, b_csv = st.columns(2)
+    if b_reset.button("🗑️ 전체 비우기", use_container_width=True):
         st.session_state['calc_data'] = {i: {"name": "", "price": 0} for i in range(6)}
-        st.session_state['next_idx'] = 0
+        st.session_state['focus_idx'] = 0
         st.rerun()
     
-    csv_df = pd.DataFrame({"부품": labels, "모델": [st.session_state['calc_data'][i]['name'] for i in range(6)], "가": [f"{st.session_state['calc_data'][i]['price']:,}" for i in range(6)]})
-    b2.download_button("💾 CSV", data=csv_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo.csv", use_container_width=True)
+    # CSV 다운로드
+    csv_df = pd.DataFrame({"구분": labels, "모델": [st.session_state['calc_data'][i]['name'] for i in range(6)], "매입가": [st.session_state['calc_data'][i]['price'] for i in range(6)]})
+    b_csv.download_button("💾 견적 저장", data=csv_df.to_csv(index=False).encode('utf-8-sig'), file_name="dodo_price.csv", use_container_width=True)
+
+else:
+    st.warning("🔄 상단 버튼을 눌러 시세를 로딩해주세요.")
