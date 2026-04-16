@@ -7,26 +7,35 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="꼬꼬닥'S 컴퓨터 매입계산기", layout="wide")
 
-# 2. CSS 최적화: 모든 입력창 높이 통일 및 버튼 정렬
+# 2. CSS 정밀 수정: 셀렉트박스 텍스트 정렬 및 높이 일치
 st.markdown("""
     <style>
-    /* 1. 셀렉트박스, 입력창, 버튼 높이를 45px로 강제 통일 */
-    div[data-baseweb="select"] > div, 
-    div[data-baseweb="input"] > div, 
-    div.stTextInput > div > div > input,
-    .stButton > button {
-        height: 45px !important; 
-        min-height: 45px !important;
-        line-height: 45px !important;
-    }
-    
-    /* 2. 상품명 말줄임표 처리 */
-    .truncate-text {
-        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        display: block; max-width: 100%;
+    /* 전체 입력창 높이 및 정렬 통일 */
+    div[data-baseweb="select"], 
+    div[data-baseweb="input"],
+    .stTextInput input,
+    .stSelectbox div[role="button"] {
+        height: 48px !important; 
+        min-height: 48px !important;
+        display: flex !important;
+        align-items: center !important; /* 수직 중앙 정렬 */
     }
 
-    /* 3. 테이블 헤더 디자인 */
+    /* 셀렉트박스 내부 텍스트 위치 교정 */
+    div[data-baseweb="select"] > div {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+    
+    /* 검색창 내부 텍스트 위치 교정 */
+    .stTextInput input {
+        padding-top: 0px !important;
+        padding-bottom: 0px !important;
+    }
+
+    /* 테이블 헤더 및 구분선 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 12px 0; font-weight: bold; border-radius: 4px; text-align: center;
@@ -34,20 +43,19 @@ st.markdown("""
     }
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
-    
-    /* 4. 분류 및 금액 중앙 정렬 */
+
+    /* 셀 내 데이터 중앙 정렬 */
     .cell-center { 
         text-align: center; display: flex; align-items: center; justify-content: center; 
-        height: 45px; border-right: 1px solid #f0f2f6; 
+        height: 48px; border-right: 1px solid #f0f2f6; 
     }
-    .cell-left { display: flex; align-items: center; padding-left: 10px; height: 45px; border-right: 1px solid #f0f2f6; }
-    
-    /* 5. 담기(+) 버튼 정중앙 배치 */
+    .cell-left { display: flex; align-items: center; padding-left: 10px; height: 48px; border-right: 1px solid #f0f2f6; }
+
+    /* 담기 버튼 정중앙 배치 */
     div.stButton > button[key^="add_"] {
-        width: 35px !important; min-width: 35px !important; height: 35px !important; 
-        border-radius: 50% !important; padding: 0 !important; font-size: 14px !important;
+        width: 38px !important; min-width: 38px !important; height: 38px !important; 
+        border-radius: 50% !important; padding: 0 !important;
         margin: 0 auto !important; display: block !important;
-        line-height: 35px !important; /* 버튼 내 기호 중앙 정렬 */
     }
 
     .price-text { color: red; font-weight: bold; margin: 0; font-size: 16px; }
@@ -55,7 +63,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 수집 (캐시 유지)
+# 3. 데이터 수집 함수 (기존과 동일)
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -109,7 +117,7 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# 4. 세션 관리
+# 4. 세션 관리 및 콜백 (지연 감소)
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
 if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
 for i in range(6):
@@ -127,17 +135,18 @@ def reset_calc():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# --- 화면 구성 시작 ---
+# --- UI 구성 ---
 st.title("🐔꼬꼬닥'S 컴퓨터 매입계산기🖥️")
 
-if st.button("🔄 시세 DB 갱신", type="primary"):
+# 시세 DB 갱신 버튼도 높이 통일 적용
+if st.button("🔄 시세 DB 갱신", type="primary", use_container_width=False):
     st.cache_data.clear()
     st.rerun()
 
 st.divider()
 
-# 필터 영역: 높이 통일 적용
 df = fetch_data()
+# 컬럼 배치 및 높이 정렬
 c_cat, c_search = st.columns([1, 2.5])
 with c_cat:
     cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
@@ -158,19 +167,18 @@ st.markdown("""
     </div>
     """, unsafe_allow_html=True)
 
-with st.container(height=380):
+with st.container(height=400):
     for i, row in f_df.iterrows():
         cols = st.columns([1, 2.5, 1.5, 0.8])
         cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
         cols[1].markdown(f'<div class="cell-left"><span class="truncate-text" title="{row["상품명"]}">{row["상품명"]}</span></div>', unsafe_allow_html=True)
         cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
         with cols[3]:
-            # 담기 버튼 정중앙 배치
             st.button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
 
 st.divider()
 
-# 하단 계산기 영역
+# 계산기 리스트 (이미지 순서 반영)
 st.subheader("🛒 매입 계산 리스트")
 st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
@@ -179,17 +187,16 @@ for i in range(6):
     st.write(f"**{labels[i]}**")
     c1, c2 = st.columns([3, 1])
     with c1:
-        st.text_input(f"모델명_{i}", key=f"nm_{i}", label_visibility="collapsed")
+        st.text_input(f"모델_{i}", key=f"nm_{i}", label_visibility="collapsed")
     with c2:
-        st.number_input(f"금액_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+        st.number_input(f"가_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
     total_sum += st.session_state[f"pr_{i}"]
 
 st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
 
-# 하단 버튼
 b_col1, b_col2, _ = st.columns([1.5, 1.5, 2.5])
 with b_col1:
-    st.button("🗑️ 계산기 초기화", use_container_width=True, on_click=reset_calc)
+    st.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_calc)
 with b_col2:
     res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{k}"] for k in range(6)], "금액": [st.session_state[f"pr_{k}"] for k in range(6)]})
     st.download_button("💾 CSV 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="purchase_list.csv", use_container_width=True)
