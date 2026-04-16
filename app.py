@@ -4,51 +4,52 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 
-# 1. 페이지 설정 및 타이틀 변경
+# 1. 페이지 설정
 st.set_page_config(page_title="컴퓨터매입계산기", layout="wide")
 
-# 2. CSS 최적화: 상품명 줄임 처리 및 버튼 디자인
+# 2. CSS 최적화: 구분선 추가 및 중앙 정렬 강화
 st.markdown("""
     <style>
-    /* 입력창 및 버튼 높이 통일 */
+    /* 입력창 및 버튼 높이 */
     div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, .stButton > button {
         height: 45px !important; min-height: 45px !important;
     }
     
-    /* 상품명 말줄임표(...) 처리 - 너비를 줄이기 위해 max-width 조정 */
+    /* 상품명 말줄임표 처리 */
     .truncate-text {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
         display: block;
-        max-width: 350px; /* 기존보다 훨씬 짧게 설정 */
+        max-width: 100%;
     }
 
-    /* 테이블 헤더 스타일 */
+    /* 테이블 헤더: 세로 구분선(|) 추가 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 12px 0; font-weight: bold; border-radius: 4px; text-align: center;
         margin-bottom: 8px; font-size: 15px;
     }
+    .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
+    .header-item:last-child { border-right: none; }
     
-    /* 리스트 내 담기(+) 버튼 (동그랗게) */
+    /* 본문 데이터 중앙 정렬 및 세로선 */
+    .cell-center { text-align: center; display: flex; align-items: center; justify-content: center; height: 40px; border-right: 1px solid #f0f2f6; }
+    .cell-left { display: flex; align-items: center; padding-left: 10px; height: 40px; border-right: 1px solid #f0f2f6; }
+    .cell-last { display: flex; align-items: center; justify-content: center; height: 40px; }
+
+    /* 담기 버튼 스타일 */
     div.stButton > button[key^="add_"] {
-        width: 38px !important; min-width: 38px !important; height: 38px !important; 
-        border-radius: 50% !important; padding: 0 !important;
+        width: 35px !important; min-width: 35px !important; height: 35px !important; 
+        border-radius: 50% !important; padding: 0 !important; font-size: 14px !important;
     }
 
-    /* 하단 버튼 글자 잘림 방지 */
-    .stButton > button {
-        min-width: 160px !important;
-        font-weight: 600 !important;
-    }
-
-    .price-text { color: red; font-weight: bold; text-align: center; font-size: 16px; margin: 0; }
+    .price-text { color: red; font-weight: bold; margin: 0; font-size: 16px; }
     .block-container { padding-top: 1.5rem !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 수집 함수 (기존 URL 리스트 포함)
+# 3. 데이터 수집 함수
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -102,7 +103,7 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# 4. 세션 상태 관리 (초기화 및 담기 기능)
+# 4. 세션 상태 관리
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
 if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
 for i in range(6):
@@ -120,12 +121,9 @@ def reset_calc():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# --- 화면 구성 시작 ---
-
-# 타이틀 수정
+# --- 화면 구성 ---
 st.title("💻 컴퓨터매입계산기")
 
-# 시세 DB 갱신 버튼 - 타이틀 바로 아래 단독 배치
 if st.button("🔄 시세 DB 갱신", type="primary"):
     st.cache_data.clear()
     st.rerun()
@@ -144,18 +142,28 @@ f_df = df.copy()
 if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 테이블 헤더: 비율 조정 (상품명 칸 비중 축소)
-st.markdown('<div class="table-header"><div style="flex:1;">분류</div><div style="flex:2.2;">상품명</div><div style="flex:1.5;">금액</div><div style="flex:0.8;">담기</div></div>', unsafe_allow_html=True)
+# ★ 테이블 헤더: 구분선(|) 추가 및 비율 조정 ★
+st.markdown("""
+    <div class="table-header">
+        <div class="header-item" style="flex:1;">분류</div>
+        <div class="header-item" style="flex:2.5;">상품명</div>
+        <div class="header-item" style="flex:1.5;">금액</div>
+        <div class="header-item" style="flex:0.8; border-right:none;">담기</div>
+    </div>
+    """, unsafe_allow_html=True)
 
-with st.container(height=380):
+with st.container(height=400):
     for i, row in f_df.iterrows():
-        # 열 너비 비율 수정 [1, 2.2, 1.5, 0.8]
-        cols = st.columns([1, 2.2, 1.5, 0.8])
-        cols[0].write(row['분류'])
-        # 상품명: 'truncate-text' 클래스로 너비 제한 및 말줄임표 처리
-        cols[1].markdown(f'<span class="truncate-text" title="{row["상품명"]}">{row["상품명"]}</span>', unsafe_allow_html=True)
-        cols[2].markdown(f"<p class='price-text'>{row['매입가']:,}</p>", unsafe_allow_html=True)
-        cols[3].button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
+        cols = st.columns([1, 2.5, 1.5, 0.8])
+        # 분류: 중앙 정렬 및 세로선
+        cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
+        # 상품명: 좌측 정렬 및 말줄임표
+        cols[1].markdown(f'<div class="cell-left"><span class="truncate-text" title="{row["상품명"]}">{row["상품명"]}</span></div>', unsafe_allow_html=True)
+        # 금액: 중앙 정렬
+        cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
+        # 담기 버튼
+        with cols[3]:
+            st.button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
 
 st.divider()
 
@@ -168,13 +176,13 @@ cal_cols = st.columns(2)
 for i in range(6):
     with cal_cols[i % 2]:
         st.write(f"**{labels[i]}**")
-        st.text_input(f"name_input_{i}", key=f"nm_{i}", label_visibility="collapsed")
-        st.number_input(f"price_input_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+        st.text_input(f"name_in_{i}", key=f"nm_{i}", label_visibility="collapsed")
+        st.number_input(f"price_in_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
         total_sum += st.session_state[f"pr_{i}"]
 
 st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
 
-# 하단 버튼 명칭 수정
+# 하단 버튼
 b_col1, b_col2, _ = st.columns([1.5, 1.5, 2.5])
 with b_col1:
     st.button("🗑️ 계산기 초기화", use_container_width=True, on_click=reset_calc)
