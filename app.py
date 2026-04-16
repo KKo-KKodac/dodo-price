@@ -31,14 +31,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 세션 상태 초기화 (위젯 로드 전에 수행)
+# 3. 세션 상태 초기화
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
 if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
 for i in range(6):
     if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
     if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
 
-# 4. 콜백 함수: 버튼 클릭 시 즉시 데이터 업데이트 (지연 방지 핵심)
+# 4. 콜백 함수
 def add_item_callback(name, price):
     idx = st.session_state['target_idx']
     st.session_state[f"nm_{idx}"] = name
@@ -50,7 +50,7 @@ def reset_callback():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# 5. 데이터 수집 (캐시 적용)
+# 5. 데이터 수집 (요청하신 주소 추가 완료)
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -85,7 +85,8 @@ def fetch_data():
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4021",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4090",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029",
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139"
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=57"  # 추가된 주소
     ]
     all_rows = []
     for url in URLS:
@@ -130,12 +131,11 @@ with st.container(height=380):
         cols[1].markdown(f'<div class="cell-left"><span class="truncate-text">{row["상품명"]}</span></div>', unsafe_allow_html=True)
         cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
         with cols[3]:
-            # 핵심: st.button에 on_click 콜백을 사용하여 즉각 반영 및 속도 개선
             st.button("➕", key=f"add_{i}", on_click=add_item_callback, args=(row['상품명'], row['매입가']))
 
 st.divider()
 
-# 하단 계산기 리스트 (프래그먼트 제거하여 데이터 누락 방지)
+# 하단 계산기 리스트
 st.subheader("🛒 매입 계산 리스트")
 st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
@@ -144,7 +144,6 @@ for i in range(6):
     st.write(f"**{labels[i]}**")
     c1, c2 = st.columns([3, 1])
     with c1:
-        # key를 세션 상태와 일치시켜 데이터가 절대 지워지지 않도록 함
         st.text_input(f"모델명_{i}", key=f"nm_{i}", label_visibility="collapsed")
     with c2:
         st.number_input(f"금액_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
