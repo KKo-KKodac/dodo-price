@@ -50,7 +50,7 @@ def reset_callback():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# 5. 데이터 수집 (요청하신 주소 추가 완료)
+# 5. 데이터 수집 (누락된 CPU 주소 복구 및 신규 주소 유지)
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -86,7 +86,11 @@ def fetch_data():
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=4090",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4029",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=4026&ctgry_no3=4139",
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=57"  # 추가된 주소
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=10&ctgry_no2=57",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866", # CPU 복구
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141", # CPU 복구
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608", # CPU 복구
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7"     # CPU 복구
     ]
     all_rows = []
     for url in URLS:
