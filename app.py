@@ -7,17 +7,26 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="꼬꼬닥'S 컴퓨터 매입계산기", layout="wide")
 
-# 2. CSS 최적화: 버튼 중앙 정렬 및 디자인
+# 2. CSS 최적화: 모든 입력창 높이 통일 및 버튼 정렬
 st.markdown("""
     <style>
-    div[data-baseweb="select"] > div, div[data-baseweb="input"] > div, .stButton > button {
-        height: 45px !important; min-height: 45px !important;
+    /* 1. 셀렉트박스, 입력창, 버튼 높이를 45px로 강제 통일 */
+    div[data-baseweb="select"] > div, 
+    div[data-baseweb="input"] > div, 
+    div.stTextInput > div > div > input,
+    .stButton > button {
+        height: 45px !important; 
+        min-height: 45px !important;
+        line-height: 45px !important;
     }
+    
+    /* 2. 상품명 말줄임표 처리 */
     .truncate-text {
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         display: block; max-width: 100%;
     }
-    /* 테이블 헤더 */
+
+    /* 3. 테이블 헤더 디자인 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 12px 0; font-weight: bold; border-radius: 4px; text-align: center;
@@ -26,19 +35,21 @@ st.markdown("""
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
     
-    /* 중앙 정렬 셀 (담기 버튼용) */
+    /* 4. 분류 및 금액 중앙 정렬 */
     .cell-center { 
         text-align: center; display: flex; align-items: center; justify-content: center; 
         height: 45px; border-right: 1px solid #f0f2f6; 
     }
     .cell-left { display: flex; align-items: center; padding-left: 10px; height: 45px; border-right: 1px solid #f0f2f6; }
     
-    /* 담기 버튼 정중앙 배치 및 크기 */
+    /* 5. 담기(+) 버튼 정중앙 배치 */
     div.stButton > button[key^="add_"] {
         width: 35px !important; min-width: 35px !important; height: 35px !important; 
         border-radius: 50% !important; padding: 0 !important; font-size: 14px !important;
         margin: 0 auto !important; display: block !important;
+        line-height: 35px !important; /* 버튼 내 기호 중앙 정렬 */
     }
+
     .price-text { color: red; font-weight: bold; margin: 0; font-size: 16px; }
     .block-container { padding-top: 1.5rem !important; }
     </style>
@@ -98,14 +109,13 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# 4. 세션 상태 관리
+# 4. 세션 관리
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
 if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
 for i in range(6):
     if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
     if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
 
-# 즉각 반영을 위한 콜백 함수
 def add_to_calc(name, price):
     idx = st.session_state['target_idx']
     st.session_state[f"nm_{idx}"] = name
@@ -126,6 +136,7 @@ if st.button("🔄 시세 DB 갱신", type="primary"):
 
 st.divider()
 
+# 필터 영역: 높이 통일 적용
 df = fetch_data()
 c_cat, c_search = st.columns([1, 2.5])
 with c_cat:
@@ -153,13 +164,13 @@ with st.container(height=380):
         cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
         cols[1].markdown(f'<div class="cell-left"><span class="truncate-text" title="{row["상품명"]}">{row["상품명"]}</span></div>', unsafe_allow_html=True)
         cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
-        # 담기 버튼을 중앙 정렬용 div에 감싸서 배치
         with cols[3]:
+            # 담기 버튼 정중앙 배치
             st.button("➕", key=f"add_{i}", on_click=add_to_calc, args=(row['상품명'], row['매입가']))
 
 st.divider()
 
-# 하단 계산기 리스트
+# 하단 계산기 영역
 st.subheader("🛒 매입 계산 리스트")
 st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
