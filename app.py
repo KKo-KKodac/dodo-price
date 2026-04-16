@@ -7,7 +7,7 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="꼬꼬닥'S 컴퓨터 매입계산기", layout="wide")
 
-# 2. CSS 정밀 수정
+# 2. CSS 정밀 수정 (높이 및 중앙 정렬)
 st.markdown("""
     <style>
     div[data-baseweb="select"], div[data-baseweb="input"], .stTextInput input, .stSelectbox div[role="button"] {
@@ -31,7 +31,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 3. 데이터 수집 함수 (기존 로직 유지)
+# 3. 세션 상태 초기화 (위젯 로드 전에 수행)
+labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
+if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
+for i in range(6):
+    if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
+    if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
+
+# 4. 콜백 함수: 버튼 클릭 시 즉시 데이터 업데이트 (지연 방지 핵심)
+def add_item_callback(name, price):
+    idx = st.session_state['target_idx']
+    st.session_state[f"nm_{idx}"] = name
+    st.session_state[f"pr_{idx}"] = price
+    st.session_state['target_idx'] = (idx + 1) % 6
+
+def reset_callback():
+    for i in range(6):
+        st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
+    st.session_state['target_idx'] = 0
+
+# 5. 데이터 수집 (캐시 적용)
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -81,45 +100,7 @@ def fetch_data():
         except: continue
     return pd.DataFrame(all_rows)
 
-# 4. 세션 상태 초기화 (데이터 유지 핵심)
-labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
-for i in range(6):
-    if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
-    if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
-if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
-
-def reset_calc():
-    for i in range(6):
-        st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
-    st.session_state['target_idx'] = 0
-
-# 5. 계산기 프래그먼트 (부분 업데이트)
-@st.fragment
-def calculator_area():
-    st.subheader("🛒 매입 계산 리스트")
-    st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
-
-    total_sum = 0
-    for i in range(6):
-        st.write(f"**{labels[i]}**")
-        c1, c2 = st.columns([3, 1])
-        with c1:
-            # key를 통해 세션 상태와 직접 연동하여 데이터 유지
-            st.text_input(f"모델명_{i}", key=f"nm_{i}", label_visibility="collapsed")
-        with c2:
-            st.number_input(f"금액_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
-        total_sum += st.session_state[f"pr_{i}"]
-
-    st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
-
-    b_col1, b_col2, _ = st.columns([1.5, 1.5, 2.5])
-    with b_col1:
-        st.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_calc)
-    with b_col2:
-        res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{k}"] for k in range(6)], "금액": [st.session_state[f"pr_{k}"] for k in range(6)]})
-        st.download_button("💾 CSV 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="purchase_list.csv", use_container_width=True)
-
-# --- 메인 실행부 ---
+# --- 화면 구성 시작 ---
 st.title("🐔꼬꼬닥'S 컴퓨터 매입계산기🖥️")
 
 if st.button("🔄 시세 DB 갱신", type="primary"):
@@ -139,30 +120,41 @@ f_df = df.copy()
 if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 테이블 헤더
-st.markdown("""
-    <div class="table-header">
-        <div class="header-item" style="flex:1;">분류</div>
-        <div class="header-item" style="flex:2.5;">상품명</div>
-        <div class="header-item" style="flex:1.5;">금액</div>
-        <div class="header-item" style="flex:0.8; border-right:none;">담기</div>
-    </div>
-    """, unsafe_allow_html=True)
+# 조회 테이블
+st.markdown('<div class="table-header"><div class="header-item" style="flex:1;">분류</div><div class="header-item" style="flex:2.5;">상품명</div><div class="header-item" style="flex:1.5;">금액</div><div class="header-item" style="flex:0.8; border-right:none;">담기</div></div>', unsafe_allow_html=True)
 
 with st.container(height=380):
     for i, row in f_df.iterrows():
         cols = st.columns([1, 2.5, 1.5, 0.8])
         cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
-        cols[1].markdown(f'<div class="cell-left"><span class="truncate-text" title="{row["상품명"]}">{row["상품명"]}</span></div>', unsafe_allow_html=True)
+        cols[1].markdown(f'<div class="cell-left"><span class="truncate-text">{row["상품명"]}</span></div>', unsafe_allow_html=True)
         cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
         with cols[3]:
-            # 담기 버튼: 클릭 시 세션 데이터를 수정하고 fragment만 새로고침
-            if st.button("➕", key=f"add_{i}"):
-                current_target = st.session_state['target_idx']
-                st.session_state[f"nm_{current_target}"] = row['상품명']
-                st.session_state[f"pr_{current_target}"] = row['매입가']
-                st.session_state['target_idx'] = (current_target + 1) % 6
-                st.rerun()
+            # 핵심: st.button에 on_click 콜백을 사용하여 즉각 반영 및 속도 개선
+            st.button("➕", key=f"add_{i}", on_click=add_item_callback, args=(row['상품명'], row['매입가']))
 
 st.divider()
-calculator_area()
+
+# 하단 계산기 리스트 (프래그먼트 제거하여 데이터 누락 방지)
+st.subheader("🛒 매입 계산 리스트")
+st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
+
+total_sum = 0
+for i in range(6):
+    st.write(f"**{labels[i]}**")
+    c1, c2 = st.columns([3, 1])
+    with c1:
+        # key를 세션 상태와 일치시켜 데이터가 절대 지워지지 않도록 함
+        st.text_input(f"모델명_{i}", key=f"nm_{i}", label_visibility="collapsed")
+    with c2:
+        st.number_input(f"금액_{i}", step=1000, key=f"pr_{i}", label_visibility="collapsed")
+    total_sum += st.session_state[f"pr_{i}"]
+
+st.markdown(f"### 💰 최종 합계: :red[{total_sum:,}원]")
+
+b_col1, b_col2, _ = st.columns([1.5, 1.5, 2.5])
+with b_col1:
+    st.button("🗑️ 전체 초기화", use_container_width=True, on_click=reset_callback)
+with b_col2:
+    res_df = pd.DataFrame({"항목": labels, "모델": [st.session_state[f"nm_{k}"] for k in range(6)], "금액": [st.session_state[f"pr_{k}"] for k in range(6)]})
+    st.download_button("💾 CSV 저장", data=res_df.to_csv(index=False).encode('utf-8-sig'), file_name="purchase_list.csv", use_container_width=True)
