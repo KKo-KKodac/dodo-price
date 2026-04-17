@@ -16,7 +16,6 @@ st.markdown("""
     }
     div[data-baseweb="select"] > div { padding: 0 !important; display: flex !important; align-items: center !important; }
     
-    /* 테이블 헤더와 본문의 라인(Border) 위치 일치화 */
     .table-header {
         display: flex; background-color: #4A90E2; color: white; 
         padding: 12px 0; font-weight: bold; border-radius: 4px; text-align: center; margin-bottom: 8px;
@@ -24,7 +23,6 @@ st.markdown("""
     .header-item { flex: 1; border-right: 1px solid rgba(255,255,255,0.3); }
     .header-item:last-child { border-right: none; }
 
-    /* 본문 셀 정렬 및 구분선 추가 */
     .cell-center { 
         text-align: center; display: flex; align-items: center; justify-content: center; 
         height: 48px; border-right: 1px solid #f0f2f6; 
@@ -33,10 +31,8 @@ st.markdown("""
         display: flex; align-items: center; padding-left: 10px; 
         height: 48px; border-right: 1px solid #f0f2f6; 
     }
-    /* 마지막 '담기' 열은 구분선 제거 */
     .no-border { border-right: none !important; }
 
-    /* + 버튼 담기 칸 정중앙 배치 */
     div.stButton > button[key^="add_"] {
         width: 38px !important; min-width: 38px !important; height: 38px !important; 
         border-radius: 50% !important; margin: 0 auto !important; display: flex !important;
@@ -129,6 +125,9 @@ if st.button("🔄 시세 DB 갱신", type="primary"):
     st.cache_data.clear()
     st.rerun()
 
+# 필독 문구 추가 (요청하신 위치)
+st.info("💡 **필독!** 접속 후 **[시세DB갱신]** 버튼을 눌러 매입금액을 확인하세요.")
+
 st.divider()
 
 df = fetch_data()
@@ -142,7 +141,7 @@ f_df = df.copy()
 if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
 if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 조회 테이블: 헤더와 본문의 비율을 [1, 2.5, 1.5, 0.8]로 동일하게 유지
+# 조회 테이블
 st.markdown("""
     <div class="table-header">
         <div class="header-item" style="flex:1;">분류</div>
@@ -159,7 +158,6 @@ with st.container(height=380):
         cols[1].markdown(f'<div class="cell-left"><span class="truncate-text">{row["상품명"]}</span></div>', unsafe_allow_html=True)
         cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
         with cols[3]:
-            # CSS 컨테이너와 동일한 폭을 보장하여 버튼을 정중앙으로 유도
             st.button("➕", key=f"add_{i}", on_click=add_item_callback, args=(row['상품명'], row['매입가']))
 
 st.divider()
