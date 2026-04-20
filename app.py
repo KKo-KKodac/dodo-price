@@ -7,7 +7,7 @@ import re
 # 1. 페이지 설정
 st.set_page_config(page_title="꼬꼬닥'S 컴퓨터 매입계산기", layout="wide")
 
-# 2. CSS 정밀 수정: 라인 일치 및 버튼 중앙 정렬
+# 2. CSS 정밀 수정
 st.markdown("""
     <style>
     div[data-baseweb="select"], div[data-baseweb="input"], .stTextInput input, .stSelectbox div[role="button"] {
@@ -31,7 +31,6 @@ st.markdown("""
         display: flex; align-items: center; padding-left: 10px; 
         height: 48px; border-right: 1px solid #f0f2f6; 
     }
-    .no-border { border-right: none !important; }
 
     div.stButton > button[key^="add_"] {
         width: 38px !important; min-width: 38px !important; height: 38px !important; 
@@ -47,6 +46,8 @@ st.markdown("""
 # 3. 세션 상태 초기화
 labels = ["CPU", "메인보드", "메모리", "SSD", "HDD", "그래픽카드"]
 if 'target_idx' not in st.session_state: st.session_state['target_idx'] = 0
+if 'data_loaded' not in st.session_state: st.session_state['data_loaded'] = False 
+
 for i in range(6):
     if f"nm_{i}" not in st.session_state: st.session_state[f"nm_{i}"] = ""
     if f"pr_{i}" not in st.session_state: st.session_state[f"pr_{i}"] = 0
@@ -63,7 +64,11 @@ def reset_callback():
         st.session_state[f"nm_{i}"], st.session_state[f"pr_{i}"] = "", 0
     st.session_state['target_idx'] = 0
 
-# 5. 데이터 수집
+def load_data_trigger():
+    st.cache_data.clear()
+    st.session_state['data_loaded'] = True 
+
+# 5. 데이터 수집 (요청하신 VGA 주소 6곳 추가 완료)
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -103,7 +108,13 @@ def fetch_data():
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3866",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=4141",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=3608",
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7"
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=7",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=3943",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=3945",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=30",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=4072",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=4138",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=4197"
     ]
     all_rows = []
     for url in URLS:
@@ -121,48 +132,47 @@ def fetch_data():
 # --- 메인 화면 ---
 st.title("🐔꼬꼬닥'S 컴퓨터 매입계산기🖥️")
 
-if st.button("🔄 시세 DB 갱신", type="primary"):
-    st.cache_data.clear()
+if st.button("🔄 시세 DB 갱신", type="primary", on_click=load_data_trigger):
     st.rerun()
 
-# 필독 문구 추가 (요청하신 위치)
 st.info("💡 **필독!** 접속 후 **[시세DB갱신]** 버튼을 눌러 매입금액을 확인하세요.")
 
 st.divider()
 
-df = fetch_data()
-c_cat, c_search = st.columns([1, 2.5])
-with c_cat:
-    cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
-with c_search:
-    query = st.text_input("검색", placeholder="상품명 입력", label_visibility="collapsed")
+if st.session_state['data_loaded']:
+    df = fetch_data()
+    c_cat, c_search = st.columns([1, 2.5])
+    with c_cat:
+        cat = st.selectbox("분류", ["전체보기"] + sorted(df["분류"].unique().tolist()), label_visibility="collapsed")
+    with c_search:
+        query = st.text_input("검색", placeholder="상품명 입력", label_visibility="collapsed")
 
-f_df = df.copy()
-if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
-if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
+    f_df = df.copy()
+    if cat != "전체보기": f_df = f_df[f_df["분류"] == cat]
+    if query: f_df = f_df[f_df["상품명"].str.contains(query, case=False)]
 
-# 조회 테이블
-st.markdown("""
-    <div class="table-header">
-        <div class="header-item" style="flex:1;">분류</div>
-        <div class="header-item" style="flex:2.5;">상품명</div>
-        <div class="header-item" style="flex:1.5;">금액</div>
-        <div class="header-item" style="flex:0.8; border-right:none;">담기</div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""
+        <div class="table-header">
+            <div class="header-item" style="flex:1;">분류</div>
+            <div class="header-item" style="flex:2.5;">상품명</div>
+            <div class="header-item" style="flex:1.5;">금액</div>
+            <div class="header-item" style="flex:0.8; border-right:none;">담기</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-with st.container(height=380):
-    for i, row in f_df.iterrows():
-        cols = st.columns([1, 2.5, 1.5, 0.8])
-        cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
-        cols[1].markdown(f'<div class="cell-left"><span class="truncate-text">{row["상품명"]}</span></div>', unsafe_allow_html=True)
-        cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
-        with cols[3]:
-            st.button("➕", key=f"add_{i}", on_click=add_item_callback, args=(row['상품명'], row['매입가']))
+    with st.container(height=380):
+        for i, row in f_df.iterrows():
+            cols = st.columns([1, 2.5, 1.5, 0.8])
+            cols[0].markdown(f'<div class="cell-center">{row["분류"]}</div>', unsafe_allow_html=True)
+            cols[1].markdown(f'<div class="cell-left"><span class="truncate-text">{row["상품명"]}</span></div>', unsafe_allow_html=True)
+            cols[2].markdown(f'<div class="cell-center price-text">{row["매입가"]:,}</div>', unsafe_allow_html=True)
+            with cols[3]:
+                st.button("➕", key=f"add_{i}", on_click=add_item_callback, args=(row['상품명'], row['매입가']))
+else:
+    st.warning("위의 [시세 DB 갱신] 버튼을 누르면 매입 시세 리스트가 나타납니다.")
 
 st.divider()
 
-# 하단 계산기 리스트
 st.subheader("🛒 매입 계산 리스트")
 st.radio("항목 선택:", range(6), format_func=lambda x: labels[x], key="target_idx", horizontal=True)
 
