@@ -68,7 +68,7 @@ def load_data_trigger():
     st.cache_data.clear()
     st.session_state['data_loaded'] = True 
 
-# 5. 데이터 수집 (요청하신 VGA 주소 6곳 추가 완료)
+# 5. 데이터 수집 (요청하신 주소 3곳 추가 완료)
 @st.cache_data(ttl=3600)
 def fetch_data():
     URLS = [
@@ -114,7 +114,10 @@ def fetch_data():
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=30",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=4072",
         "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=4138",
-        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=4197"
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=8&ctgry_no2=24&ctgry_no3=4197",
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=651", # 추가
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=1&ctgry_no2=2&ctgry_no3=5",   # 추가
+        "https://www.worldmemory.co.kr/price/computer.do?ctgry_no1=12&ctgry_no2=42&ctgry_no3=1208" # 추가
     ]
     all_rows = []
     for url in URLS:
